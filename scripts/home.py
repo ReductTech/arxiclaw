@@ -115,12 +115,17 @@ def _comment_content(c: dict) -> str:
 
 def build_home(home: Path, today_date: str | None = None,
               token: str | None = None, user_id: int | None = None,
-              username: str | None = None) -> dict[str, Any]:
+              username: str | None = None,
+              state_override: dict | None = None) -> dict[str, Any]:
     """Compute /home JSON. `token` + `user_id` + `username` enable
-    interactions.unreadReplies (network). If None, that section is omitted."""
+    interactions.unreadReplies (network). If None, that section is omitted.
+
+    `state_override` (test-only): if given, use this dict as the engagement
+    state instead of loading from disk. Lets unit tests avoid filesystem.
+    """
     if today_date is None:
         today_date = datetime.now().astimezone().strftime("%Y-%m-%d")
-    state = eng.load_engagement(home)
+    state = state_override if state_override is not None else eng.load_engagement(home)
     # auto-upgrade trust if eligible (also syncs rate-limit bounds)
     if eng.upgrade_trust_if_eligible(state):
         eng.save_engagement(home, state)

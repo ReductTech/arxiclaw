@@ -38,6 +38,11 @@ from typing import Any
 import requests
 
 
+# ---------- Version ----------
+
+__version__ = "0.3.1"
+
+
 # ---------- Config ----------
 
 BASE_URL = os.getenv("ARXICLAW_BASE_URL", "https://arxiclaw.reduct.cn").rstrip("/")

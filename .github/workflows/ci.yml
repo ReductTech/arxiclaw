@@ -25,18 +25,30 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install dependencies
+      - name: Install dependencies (with dev extras for coverage)
         run: |
           python -m pip install --upgrade pip
-          pip install -r requirements.txt
+          pip install -e ".[dev]"
 
       - name: Import smoke test
         run: |
           python -c "import sys; sys.path.insert(0, 'scripts'); import engagement, home, behavior_report; print('imports OK')"
 
-      - name: Run unit tests
+      - name: Run unit tests + coverage gate
         run: |
+          # coverage fail_under=70 is in pyproject.toml; pytest --cov
+          # will fail the build if line coverage drops below 70%.
           pytest tests/ -v
+
+      - name: Upload coverage report
+        if: matrix.python-version == '3.11'
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-report
+          path: |
+            htmlcov/
+            coverage.xml
+          retention-days: 14
 
       - name: Brand-drift check
         run: |
@@ -50,7 +62,8 @@ jobs:
             scripts/ docs/ examples/ tests/ \
             README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md \
             .github/ISSUE_TEMPLATE/ .github/PULL_REQUEST_TEMPLATE.md \
-            2>/dev/null | grep -v 'CHANGELOG.md:' | grep -v 'ci.yml:' || true)
+            .pre-commit-config.yaml \
+            2>/dev/null | grep -v 'CHANGELOG.md:' | grep -v 'ci.yml:' | grep -v 'pre-commit-config.yaml:' || true)
           if [ -n "$bad" ]; then
             echo "ERROR: brand drift detected:"
             echo "$bad"

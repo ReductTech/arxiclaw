@@ -1,0 +1,94 @@
+# arxiclaw pre-commit hooks
+#
+# Install once:        pip install pre-commit
+#                     pre-commit install
+# Run on all files:    pre-commit run --all-files
+# Skip in emergency:   git commit --no-verify
+#
+# Hooks here are FAST (under 30s on a clean repo). Slow hooks (pytest, full
+# ruff with all rules) belong in CI, not in pre-commit.
+#
+# See https://pre-commit.com for details.
+
+repos:
+  # ----- generic file hygiene -----
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.5.0
+    hooks:
+      - id: trailing-whitespace
+        args: [--markdown-linebreak-ext=md]
+      - id: end-of-file-fixer
+      - id: check-merge-conflict
+      - id: check-case-conflict
+      - id: check-yaml
+      - id: check-json
+      - id: detect-private-key
+      - id: mixed-line-ending
+        args: [--fix=lf]
+      - id: no-commit-to-branch
+        args: [--branch=main,master]
+
+  # ----- black: opinionated formatter (optional, uncomment if you adopt it) -----
+  # - repo: https://github.com/psf/black
+  #   rev: 24.1.1
+  #   hooks:
+  #     - id: black
+  #       language_version: python3
+
+  # ----- ruff: linter + isort (fast) -----
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.1.15
+    hooks:
+      - id: ruff
+        # Only run on tests; scripts/ is exempt (see pyproject.toml per-file-ignores)
+        args: [--fix, --exit-non-zero-on-fix]
+        files: ^tests/
+      - id: ruff-format
+        files: ^tests/
+
+  # ----- project-specific: brand-drift guard -----
+  - repo: local
+    hooks:
+      - id: brand-drift
+        name: "arxiclaw brand-drift check"
+        description: "Reject any new arXivClaw / arxivclaw / moltbook references in working tree"
+        entry: |
+          bash -c '
+            bad=$(grep -rEn "arXivClaw|arxivclaw|moltbook" \
+              --include="*.py" --include="*.md" --include="*.yml" --include="*.json" --include="*.bat" \
+              --exclude-dir=".git" \
+              scripts/ docs/ examples/ tests/ \
+              README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md \
+              .github/ISSUE_TEMPLATE/ .github/PULL_REQUEST_TEMPLATE.md \
+              2>/dev/null \
+              | grep -v "CHANGELOG.md:" | grep -v "ci.yml:" | grep -v "pre-commit-config.yaml:" | grep -v "brand-drift check" || true)
+            if [ -n "$bad" ]; then
+              echo "ERROR: brand drift detected:"
+              echo "$bad"
+              exit 1
+            fi
+            echo "brand-drift: OK"
+          '
+        language: system
+        pass_filenames: false
+        types_or: [python, markdown, yaml, json]
+        stages: [pre-commit]
+
+      - id: no-secrets-in-commits
+        name: "no secrets in commits"
+        description: "Reject commits that contain plaintext API keys or tokens"
+        entry: |
+          bash -c '
+            bad=$(git diff --cached --unified=0 --no-color \
+              | grep -E "^\+.*(aclk_[a-zA-Z0-9]{20,}|ARXICLAW_API_KEY=[a-zA-Z0-9]{20,})" \
+              | grep -v "ARXICLAW_API_KEY=$" \
+              | grep -v "ARXICLAW_API_KEY=<" || true)
+            if [ -n "$bad" ]; then
+              echo "ERROR: plaintext secret in staged change:"
+              echo "$bad"
+              exit 1
+            fi
+          '
+        language: system
+        pass_filenames: false
+        stages: [pre-commit]

@@ -1,0 +1,160 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "arxiclaw-agent"
+version = "0.3.1"
+description = "An autonomous research-agent client for the arxivlaw platform. Discovers papers, writes multi-language digests, and engages on behalf of researchers — all under a 3-tier trust system."
+readme = "README.md"
+license = {text = "MIT"}
+requires-python = ">=3.10"
+keywords = ["arxiv", "research", "agent", "llm", "cli"]
+authors = [
+    {name = "arxiclaw contributors"}
+]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Science/Research",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Information Analysis",
+    "Topic :: Sociology :: General",
+]
+
+dependencies = [
+    "requests>=2.31.0",
+    "PyYAML>=6.0",
+]
+
+[project.optional-dependencies]
+# dev: pip install -e ".[dev]"
+dev = [
+    "pytest>=7.0",
+    "pytest-cov>=4.0",
+    "ruff>=0.1.0",
+    "pre-commit>=3.0",
+]
+# docs: pip install -e ".[docs]"
+docs = [
+    # Currently no docs-build dependencies; all docs are .md
+]
+# all: pip install -e ".[all]"
+all = [
+    "arxiclaw-agent[dev,docs]",
+]
+
+[project.urls]
+"Homepage" = "https://github.com/ReductTech/arxiclaw"
+"Bug Tracker" = "https://github.com/ReductTech/arxiclaw/issues"
+"Source" = "https://github.com/ReductTech/arxiclaw"
+
+# ----- entry points -----
+# After `pip install -e .`, these commands are available on PATH:
+#   arxiclaw-daily     → python -m scripts.daily_runner
+#   arxiclaw-doctor    → python -m scripts.doctor
+#   arxiclaw-install    → python -m scripts.install
+#   arxiclaw-upgrade    → python -m scripts.upgrade
+#   arxiclaw-migrate    → python -m scripts.migrate
+[project.scripts]
+arxiclaw-daily = "scripts.daily_runner:main"
+arxiclaw-doctor = "scripts.doctor:main"
+arxiclaw-install = "scripts.install:main"
+arxiclaw-upgrade = "scripts.upgrade:main"
+arxiclaw-migrate = "scripts.migrate:main"
+arxiclaw-bootstrap = "scripts.bootstrap:main"
+arxiclaw-onboard = "scripts.onboard:main"
+arxiclaw-uninstall = "scripts.uninstall:main"
+
+[tool.setuptools]
+# We ship flat scripts/ and tests/ and references/, so include_package=True
+# is the right call. We do NOT use src/ layout (per AGENTS.md §6.1).
+include-package-data = true
+packages = ["scripts"]
+
+[tool.setuptools.package-data]
+# scripts/*.py and tests/*.py are pure-Python, but ship default JSON configs
+"scripts" = ["*.default.json"]
+
+# ----- pytest -----
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = ["test_*.py"]
+python_classes = ["Test*"]
+python_functions = ["test_*"]
+addopts = [
+    "-v",
+    "--tb=short",
+    "--strict-markers",
+    "--cov=scripts",
+    "--cov-report=term-missing:skip-covered",
+    "--cov-report=html:htmlcov",
+    "--cov-report=xml:coverage.xml",
+]
+filterwarnings = [
+    "ignore::DeprecationWarning",
+    "ignore::PendingDeprecationWarning",
+]
+
+# ----- coverage gate -----
+# Run: pytest  (CI fails below 70% line coverage)
+[tool.coverage.run]
+branch = false
+source = ["scripts"]
+omit = [
+    "scripts/__init__.py",
+    "scripts/run_daily.bat",
+    "scripts/*.default.json",
+]
+
+[tool.coverage.report]
+# CI fails build if coverage drops below this threshold.
+fail_under = 70
+show_missing = true
+skip_covered = false
+exclude_lines = [
+    "pragma: no cover",
+    "raise NotImplementedError",
+    "if __name__ == .__main__.:",
+    "if TYPE_CHECKING:",
+]
+
+# ----- ruff -----
+[tool.ruff]
+target-version = "py310"
+line-length = 100
+extend-exclude = ["*.pyc", "__pycache__", ".git", "build", "dist"]
+
+[tool.ruff.lint]
+# Conservative set: keep the legacy code passing without rewriting it.
+select = ["E", "F", "I"]  # pycodestyle + pyflakes + isort
+ignore = [
+    "E501",  # line too long (legacy has many)
+    "E402",  # module-level import not at top (legacy interleaves)
+    "E731",  # do not assign a lambda (intentional in some places)
+    "F401",  # imported but unused (legacy re-exports)
+    "F841",  # local variable assigned but never used (legacy dead code)
+]
+
+[tool.ruff.lint.per-file-ignores]
+# scripts/daily_runner.py is 3500 lines of legacy code; lint-exempt.
+"scripts/daily_runner.py" = ["E", "F", "I"]
+# tests can have unused imports (e.g. pytest fixtures, marker scaffolding).
+"tests/*" = ["F401", "F811"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["scripts"]
+
+# ----- mypy (optional, not enforced) -----
+[tool.mypy]
+python_version = "3.10"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
+no_implicit_optional = true
+
+# ----- pre-commit hook config lives in .pre-commit-config.yaml -----
