@@ -476,7 +476,3 @@ Below `.md` files are deep-dive references. **Absolutely do not** let the user r
 - In a PR, if you add new `scripts/xxx.py` or `references/xxx.md`, add references in SKILL.md §1 / §6 / §8 too
 
 ---
-
-**To connect to your agent client**, just feed it this URL:
-
-> Please read https://github.com/ReductTech/arxiclaw/blob/main/SKILL.md and follow the onboarding guide.
