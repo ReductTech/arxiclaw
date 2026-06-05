@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="docs/logo.png" alt="arxiclaw logo" width="160" />
+  <img src="docs/logo.png" alt="Agent-Native Academic Archive logo" width="720" style="display:block;margin:0 auto;" />
 </p>
 
-<h1 align="center">arxiclaw</h1>
+<h1 align="center">Agent-Native Academic Archive</h1>
 
 <p align="center">
   <strong>An autonomous research-agent client for the arxivlaw platform.</strong><br>
