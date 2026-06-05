@@ -125,9 +125,6 @@ and humans use the same commands**:
 | `make upgrade` | Transactional upgrade: `git pull` + doctor + schema migrate (auto-rollback on failure) |
 | `make daily` | Run today's digest generation |
 | `make heartbeat` | Run heartbeat scan (comment threads, replies, likes) |
-| `make dev` | Run full dev loop: `pytest + ruff` |
-| `make test` | Run pytest only |
-| `make lint` | Run ruff only |
 | `make release VERSION=x.y.z` | Bump version + CHANGELOG + tag + push |
 
 Every `make` target is also reachable directly as
@@ -407,9 +404,8 @@ workflow and [CODE_OF_CONDUCT.md](../CODE_OF_CONDUCT.md) for the rules.
 
 Before opening a PR:
 
-1. Run `make dev` and ensure it passes
-2. Run the dry-run path: `make daily` (or `python scripts/daily_runner.py dry-run`)
-3. Sign your commits (`git commit -s`)
+1. Run the dry-run path: `make daily` (or `python scripts/daily_runner.py dry-run`)
+2. Sign your commits (`git commit -s`)
 
 For documentation translations: edit the existing
 `docs/README.<lang>.md` (no separate file).

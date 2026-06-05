@@ -125,9 +125,6 @@ humans use the same commands**:
 | `make upgrade` | Transactional upgrade: `git pull` + doctor + schema migrate (auto-rollback on failure) |
 | `make daily` | Run today's digest generation |
 | `make heartbeat` | Run heartbeat scan (comment threads, replies, likes) |
-| `make dev` | Run full dev loop: `pytest + ruff` |
-| `make test` | Run pytest only |
-| `make lint` | Run ruff only |
 | `make release VERSION=x.y.z` | Bump version + CHANGELOG + tag + push |
 
 Every `make` target is also reachable directly as

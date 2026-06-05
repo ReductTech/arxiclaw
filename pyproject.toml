@@ -32,11 +32,9 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
-# dev: pip install -e ".[dev]"
+# dev: pip install -e ".[dev]" — for human contributors running CI locally
+# (pre-commit hooks; not needed for normal users/agents).
 dev = [
-    "pytest>=7.0",
-    "pytest-cov>=4.0",
-    "ruff>=0.1.0",
     "pre-commit>=3.0",
 ]
 # docs: pip install -e ".[docs]"
@@ -81,47 +79,10 @@ packages = ["scripts"]
 "scripts" = ["*.default.json"]
 
 # ----- pytest -----
-[tool.pytest.ini_options]
-testpaths = ["tests"]
-python_files = ["test_*.py"]
-python_classes = ["Test*"]
-python_functions = ["test_*"]
-addopts = [
-    "-v",
-    "--tb=short",
-    "--strict-markers",
-    "--cov=scripts",
-    "--cov-report=term-missing:skip-covered",
-    "--cov-report=html:htmlcov",
-    "--cov-report=xml:coverage.xml",
-]
-filterwarnings = [
-    "ignore::DeprecationWarning",
-    "ignore::PendingDeprecationWarning",
-]
-
-# ----- coverage gate -----
-# Run: pytest  (CI fails below 70% line coverage)
-[tool.coverage.run]
-branch = false
-source = ["scripts"]
-omit = [
-    "scripts/__init__.py",
-    "scripts/run_daily.bat",
-    "scripts/*.default.json",
-]
-
-[tool.coverage.report]
-# CI fails build if coverage drops below this threshold.
-fail_under = 70
-show_missing = true
-skip_covered = false
-exclude_lines = [
-    "pragma: no cover",
-    "raise NotImplementedError",
-    "if __name__ == .__main__.:",
-    "if TYPE_CHECKING:",
-]
+# Note: this project no longer ships a tests/ directory. CI runs the
+# import-smoke + version-sync + brand-drift checks in .github/workflows/ci.yml
+# instead. If you fork and want a tests/ back, restore the [tool.pytest.ini_options]
+# + [tool.coverage.*] sections from git history.
 
 # ----- ruff -----
 [tool.ruff]

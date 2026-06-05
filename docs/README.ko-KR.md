@@ -113,9 +113,6 @@ skill 문서가 **다중 턴 대화**로 사용자를 안내합니다: 이메일
 | `make upgrade` | 트랜잭션 업그레이드: `git pull` + doctor + schema migrate (실패 시 자동 롤백) |
 | `make daily` | 오늘의 다이제스트 생성 |
 | `make heartbeat` | heartbeat 스캔 실행 (댓글 스레드, 답글, 좋아요) |
-| `make dev` | 전체 개발 루프: `pytest + ruff` |
-| `make test` | pytest만 |
-| `make lint` | ruff만 |
 | `make release VERSION=x.y.z` | 버전 업 + CHANGELOG + 태그 + push |
 
 모든 `make` 타겟은 `python scripts/<대응>.py`로도 직접 실행 가능 (`make` 없는 환경용).

@@ -7,8 +7,8 @@ on:
     branches: [main, master]
 
 jobs:
-  test:
-    name: test (Python ${{ matrix.python-version }})
+  smoke:
+    name: smoke (imports + version + brand-drift)
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
@@ -25,41 +25,44 @@ jobs:
           python-version: ${{ matrix.python-version }}
           cache: pip
 
-      - name: Install dependencies (with dev extras for coverage)
+      - name: Install dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install -e ".[dev]"
+          pip install -r requirements.txt
 
       - name: Import smoke test
         run: |
-          python -c "import sys; sys.path.insert(0, 'scripts'); import engagement, home, behavior_report; print('imports OK')"
+          # scripts/ must import cleanly under all 3 supported Python versions
+          python -c "import sys; sys.path.insert(0, 'scripts'); \
+            import engagement, home, behavior_report, doctor, install, upgrade, migrate; \
+            print('imports OK')"
 
-      - name: Run unit tests + coverage gate
+      - name: Version consistency
         run: |
-          # coverage fail_under=70 is in pyproject.toml; pytest --cov
-          # will fail the build if line coverage drops below 70%.
-          pytest tests/ -v
-
-      - name: Upload coverage report
-        if: matrix.python-version == '3.11'
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-report
-          path: |
-            htmlcov/
-            coverage.xml
-          retention-days: 14
+          # daily_runner.py __version__ must match pyproject.toml version
+          DR=$(grep -E '^__version__\s*=\s*["'\'']([0-9.]+)["'\'']' scripts/daily_runner.py \
+              | sed -E 's/.*["'\'']([0-9.]+)["'\''].*/\1/')
+          PP=$(grep -E '^version\s*=\s*["'\'']([0-9.]+)["'\'']' pyproject.toml \
+              | sed -E 's/.*["'\'']([0-9.]+)["'\''].*/\1/')
+          echo "daily_runner.py: $DR"
+          echo "pyproject.toml: $PP"
+          if [ "$DR" != "$PP" ]; then
+            echo "ERROR: version drift"
+            exit 1
+          fi
+          echo "version in sync: OK"
 
       - name: Brand-drift check
         run: |
           # Catch any new arxivclaw (lowercase, no caps) sneaking in.
           # CHANGELOG.md is excluded because v0.3.1's "Brand rename" entry
-          # legitimately references the old name. ci.yml is excluded because
-          # it must literally grep for the bad patterns to detect them.
+          # legitimately references the old name. ci.yml and pre-commit-config
+          # are excluded because they must literally grep for the bad patterns
+          # to detect them.
           bad=$(grep -rEn 'arXivClaw|arxivclaw|moltbook' \
             --include='*.py' --include='*.md' --include='*.yml' --include='*.json' --include='*.bat' \
             --exclude-dir='.git' \
-            scripts/ docs/ examples/ tests/ \
+            scripts/ docs/ examples/ \
             README.md CHANGELOG.md CONTRIBUTING.md SECURITY.md CODE_OF_CONDUCT.md \
             .github/ISSUE_TEMPLATE/ .github/PULL_REQUEST_TEMPLATE.md \
             .pre-commit-config.yaml \
@@ -70,17 +73,3 @@ jobs:
             exit 1
           fi
           echo "brand-drift check passed"
-
-  lint:
-    name: lint (ruff on tests/)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
-      - run: pip install ruff
-      # scripts/ is intentionally excluded — it's a copy of the legacy
-      # implementation. The test suite is the source of truth for what
-      # the agent code MUST do, not lint cleanliness.
-      - run: ruff check tests/

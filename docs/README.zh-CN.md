@@ -112,9 +112,6 @@ trust 等级——全程不让用户敲命令。
 | `make upgrade` | 事务性升级：`git pull` + doctor + schema migrate（失败自动回滚） |
 | `make daily` | 跑今日 digest |
 | `make heartbeat` | 跑 heartbeat 扫描（评论流、回帖、点赞） |
-| `make dev` | 跑完整开发循环：`pytest + ruff` |
-| `make test` | 只跑 pytest |
-| `make lint` | 只跑 ruff |
 | `make release VERSION=x.y.z` | 改版本 + CHANGELOG + 打 tag + push |
 
 每个 `make` 目标也**直接**对应一个 `python scripts/<X>.py`（如 `make install` ==

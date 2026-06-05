@@ -41,6 +41,12 @@ Thumbs.db
 htmlcov/
 .tox/
 
+# Note: this project no longer ships a tests/ directory. If you fork and
+# add tests back, the directory will be tracked normally. The lines below
+# are kept as a safety net for transient pytest cache + coverage reports.
+tests/__pycache__/
+tests/.pytest_cache/
+
 # Misc
 *.swp
 *.bak

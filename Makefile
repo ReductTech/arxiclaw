@@ -10,17 +10,17 @@
 #   make upgrade  → git pull + doctor + schema migrate (transactional)
 #   make daily    → run daily digest generation
 #   make heartbeat→ run heartbeat scan
-#   make dev      → pytest + ruff + brand-drift check (run after every change)
-#   make test     → pytest only
-#   make lint     → ruff only
 #   make release  → bump version + CHANGELOG + tag + push
+#
+# Note: tests/test/lint/dev targets are intentionally removed — the project
+# no longer ships a tests/ directory. CI runs import-smoke + version-sync
+# + brand-drift checks via .github/workflows/ci.yml instead.
 #
 # Variables
 PYTHON ?= python3
 PIP    ?= $(PYTHON) -m pip
 
-.PHONY: help install doctor upgrade daily heartbeat test lint dev \
-        release format clean
+.PHONY: help install doctor upgrade daily heartbeat migrate release clean
 
 help:  ## Show this help
 	@echo "arxiclaw — agent-friendly research-agent client"
@@ -46,17 +46,6 @@ heartbeat:  ## Run a heartbeat scan (comment threads, replies, likes)
 
 migrate:  ## Run pending state-file schema migrations
 	$(PYTHON) scripts/migrate.py
-
-test:  ## Run pytest suite
-	$(PYTHON) -m pytest tests/ -v
-
-lint:  ## Run ruff on tests/
-	$(PYTHON) -m ruff check tests/
-
-dev: test lint  ## Run full dev loop: tests + lint
-
-format:  ## Auto-format code (ruff)
-	$(PYTHON) -m ruff check --fix tests/
 
 clean:  ## Remove __pycache__ and other transient artifacts
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true

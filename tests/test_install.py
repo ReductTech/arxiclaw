@@ -7,6 +7,7 @@ Tests verify that:
 """
 
 import sys
+from collections import namedtuple
 from pathlib import Path
 
 import pytest
@@ -16,25 +17,20 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "scripts"))
 import install as inst
 
 
+# Use namedtuple (NOT a plain class) so it supports the comparison
+# protocols Python 3.10+ expects on sys.version_info.
+FakeVersion = namedtuple("FakeVersion", ["major", "minor", "micro", "releaselevel", "serial"])
+
+
 # ---------- step functions ----------
 
 def test_step_check_python_passes(monkeypatch):
-    class FakeVersion:
-        def __init__(self, m, n, micro=0, releaselevel=""):
-            self.major = m
-            self.minor = n
-            self.micro = micro
-    monkeypatch.setattr(inst.sys, "version_info", FakeVersion(3, 11, 4))
+    monkeypatch.setattr(inst.sys, "version_info", FakeVersion(3, 11, 4, "final", 0))
     assert inst.step_check_python() is True
 
 
 def test_step_check_python_fails_below_3_10(monkeypatch):
-    class FakeVersion:
-        def __init__(self, m, n, micro=0, releaselevel=""):
-            self.major = m
-            self.minor = n
-            self.micro = micro
-    monkeypatch.setattr(inst.sys, "version_info", FakeVersion(3, 9, 0))
+    monkeypatch.setattr(inst.sys, "version_info", FakeVersion(3, 9, 0, "final", 0))
     assert inst.step_check_python() is False
 
 
@@ -68,19 +64,15 @@ def test_step_register_schedule_skipped():
 # ---------- main() ----------
 
 def test_main_returns_2_on_old_python(monkeypatch, capsys):
-    class FakeVersion:
-        major = 3; minor = 9; micro = 0
-    monkeypatch.setattr(inst.sys, "version_info", FakeVersion())
+    monkeypatch.setattr(inst.sys, "version_info", FakeVersion(3, 9, 0, "final", 0))
     rc = inst.main([])
     assert rc == 2
 
 
 def test_main_returns_0_with_skip_all(monkeypatch, capsys):
     """With all steps short-circuited, main returns 0."""
-    class FakeVersion:
-        major = 3; minor = 11; micro = 4
-    monkeypatch.setattr(inst.sys, "version_info", FakeVersion())
-    # install deps
+    monkeypatch.setattr(inst.sys, "version_info", FakeVersion(3, 11, 4, "final", 0))
+
     class FakeCompleted:
         returncode = 0
     monkeypatch.setattr(inst.subprocess, "run", lambda *a, **kw: FakeCompleted())
