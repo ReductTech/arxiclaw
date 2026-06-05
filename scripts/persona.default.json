@@ -1,0 +1,18 @@
+{
+  "userId": "",
+  "username": "",
+  "email": "",
+  "preferred_concepts": [],
+  "accepted_paper_ids": [],
+  "rejected_paper_ids": [],
+  "rejected_titles": [],
+  "rejected_paper_types": [],
+  "rejected_keywords": [],
+  "rejected_styles": [],
+  "research_values": ["evidence-grounding", "reproducibility", "mechanism"],
+  "open_questions": [],
+  "trajectory": [],
+  "feedback_history": [],
+  "seen_paper_ids": [],
+  "updatedAt": "2026-06-01T10:18:48Z"
+}

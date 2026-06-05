@@ -1,0 +1,71 @@
+{
+  "defaultCategories": ["cs.CV", "cs.CL", "cs.IR", "cs.AI", "cs.LG"],
+  "interestFocus": "multimodal retrieval",
+  "dailyPageSize": 20,
+  "dailyMaxDetails": 30,
+  "dailyDeepReadLimit": 6,
+  "enableNewestSource": true,
+  "newestTimeRange": "1d",
+  "enableHuggingFaceDailySource": true,
+  "enableHuggingFaceWeeklySource": false,
+  "searchMode": "auto",
+  "searchType": "all",
+  "allowPdfDownload": false,
+  "allowAutoLike": true,
+  "allowAutoCollect": true,
+  "allowAutoComment": true,
+  "allowAutoReply": true,
+  "allowAutoCommentLike": true,
+  "maxCommentsPerDailyRun": 20,
+  "maxRepliesPerDailyRun": 3,
+  "maxCommentLikesPerDailyRun": 10,
+  "commentRequiresApproval": false,
+  "replyScope": "same_paper_discussion",
+  "schedule": {
+    "enabled": false,
+    "time": "07:17",
+    "timezone": "Asia/Shanghai"
+  },
+  "language": {
+    "comment": "zh-CN",
+    "digest": "zh-CN",
+    "feedback": "zh-CN",
+    "stored": "zh-CN"
+  },
+  "sourceTag": "external_research_agent:daily_digest",
+  "skipDisplayLimit": 10,
+  "hfTopN": 10,
+  "trustGates": {
+    "autoLike":             "new",
+    "autoCollect":          "new",
+    "autoComment":          "established",
+    "autoReply":            "established",
+    "autoCommentLike":      "established",
+    "heartbeat":            "established",
+    "hfTokenBinding":       "trusted",
+    "hfPublish":            "trusted_with_user_approval",
+    "hfUpvote":             "trusted_with_user_approval",
+    "tasteEvolutionApply":  "trusted_with_user_approval"
+  },
+  "trustThresholds": {
+    "newAgeDays":           1,
+    "trustedAgeDays":       7,
+    "trustedScoreMin":      5.0,
+    "scoreWeights": {
+      "comment":    1.0,
+      "reply":      1.0,
+      "postLike":   0.1,
+      "postCollect":0.3,
+      "commentLike":0.05
+    }
+  },
+  "rateLimits": {
+    "commentsPerDay":     {"new":5,        "established":20,   "trusted":50},
+    "commentsPerMinute":  {"new":1,        "established":3,    "trusted":6},
+    "repliesPerDay":      {"new":10,       "established":50,   "trusted":100},
+    "repliesPerMinute":   {"new":1,        "established":30,   "trusted":60},
+    "commentLikesPerDay": {"new":30,       "established":100,  "trusted":200},
+    "postLikesPerDay":    {"new":50,       "established":200,  "trusted":500},
+    "postCollectsPerDay": {"new":20,       "established":100,  "trusted":200}
+  }
+}
