@@ -29,7 +29,6 @@ from __future__ import annotations
 
 import json
 import os
-import time
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -77,8 +76,8 @@ def agent_home() -> Path:
     if configured:
         return Path(configured).expanduser()
     if os.name == "nt":
-        return Path(os.environ["USERPROFILE"]) / ".arxiclaw"
-    return Path.home() / ".arxiclaw"
+        return Path(os.environ["USERPROFILE"]) / ".arxiclaw-agent"
+    return Path.home() / ".arxiclaw-agent"
 
 
 def _engagement_path(home: Path) -> Path:
@@ -98,9 +97,9 @@ def default_state(user_id: int | None = None,
         "username": username,
         "email": email,
         "firstSeenAt": now,
-        "trustLevel": "new",
+        "trustLevel": "established",
         "trustUpgradeAt": None,
-        "trustHistory": [{"at": now, "level": "new", "reason": "initial"}],
+        "trustHistory": [{"at": now, "level": "established", "reason": "initial"}],
         "activity": {
             "lifetime":  _empty_activity(),
             "rolling7d": _empty_activity(),
@@ -110,6 +109,39 @@ def default_state(user_id: int | None = None,
         "rateLimits": _empty_rate_limits(),
         "lastActions": _empty_last_actions(),
     }
+
+
+def _ensure_state_shape(state: dict[str, Any]) -> dict[str, Any]:
+    """Backfill fields required by the local trust/rate-limit state machine.
+
+    Older skill builds sometimes wrote platform-home shaped state into
+    engagement_state.json. Preserve those fields, but add the local counters
+    expected by this module.
+    """
+    base = default_state(
+        user_id=state.get("userId"),
+        username=str(state.get("username") or ""),
+        email=str(state.get("email") or ""),
+    )
+    for key, value in base.items():
+        state.setdefault(key, value)
+    state.setdefault("schemaVersion", 1)
+    state.setdefault("trustLevel", "established")
+    state.setdefault("trustHistory", base["trustHistory"])
+    activity = state.setdefault("activity", {})
+    for key in ("lifetime", "rolling7d", "rolling30d", "today"):
+        bucket = activity.setdefault(key, {})
+        defaults = _empty_activity()
+        for counter, value in defaults.items():
+            bucket.setdefault(counter, value)
+    activity.setdefault("todayDate", datetime.now(timezone.utc).date().isoformat())
+    rate_limits = state.setdefault("rateLimits", {})
+    for key, value in _empty_rate_limits().items():
+        rate_limits.setdefault(key, value)
+    last_actions = state.setdefault("lastActions", {})
+    for key, value in _empty_last_actions().items():
+        last_actions.setdefault(key, value)
+    return state
 
 
 def _empty_activity() -> dict[str, int]:
@@ -167,6 +199,7 @@ def load_engagement(home: Path) -> dict[str, Any]:
             print(f"[warn] engagement_state.json unreadable ({exc}); reset",
                   file=__import__("sys").stderr, flush=True)
             state = default_state()
+    state = _ensure_state_shape(state)
     _rollover_windows(state)
     # sync rate limit bounds to the persisted trust level
     _sync_rate_limit_bounds(state, state.get("trustLevel", "new"))
@@ -492,7 +525,23 @@ def can_perform(policy: dict[str, Any], capability: str,
     Returns (ok, reason).
     """
     gates = policy.get("trustGates", {}) or {}
+    aliases = {
+        "autoLike": "auto_like",
+        "autoCollect": "auto_collect",
+        "autoComment": "auto_comment",
+        "autoReply": "auto_reply",
+        "autoCommentLike": "auto_comment_like",
+        "heartbeat": "heartbeat_scan",
+        "hfPublish": "hf_publish",
+        "hfUpvote": "hf_upvote",
+        "tasteEvolutionApply": "persona_auto_evolve",
+    }
     required = gates.get(capability)
+    if required is None:
+        required = gates.get(aliases.get(capability, ""))
+    if required is None:
+        inverse = {v: k for k, v in aliases.items()}
+        required = gates.get(inverse.get(capability, ""))
     if required is None:
         return (False, f"unknown_capability:{capability}")
     needs_approval = False

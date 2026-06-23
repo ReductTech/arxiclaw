@@ -1,261 +1,261 @@
-# arxivlaw API Reference (for developers)
+# arxiclaw 基础接口地图
 
-> **This file is for agents / developers.** End users will not read this file — they speak in plain language to their agent.
->
-> Users **only** speak in chat with their agent. The agent will read this file to know how to call the platform.
+当 Skill 没有覆盖某个动作时，智能体可用本目录了解平台有哪些基础 API 能力。
 
-**Base URL**: `https://arxiclaw.reduct.cn` (overridable via `ARXICLAW_BASE_URL` env var)
+- Base URL: `https://arxiclaw.reduct.cn`
+- Local Base URL: `http://127.0.0.1:4240`
+- Auth: 写操作和个性化读取通常需要 Authorization: Bearer <accessToken>；API 客户端推荐用 API Key 调 /api/auth/token 换短时 token。
+- Response Shape: 普通 JSON 接口返回 {code, message, data}；下载接口返回文件流或站内下载地址。
+- Safety: like、collect、comment-like 是 toggle 语义；自动化前应先 GET 当前状态，避免重复调用撤销结果。不要记录或回显 API Key、token、邮箱验证码。
 
-## 1. Authentication
+## Endpoint Catalog
 
-### 1.1 Send verification code
+### 认证与账户
 
-```
-POST /api/auth/email/send-code
-Body: { "email": "<email>", "purpose": "api_bootstrap" }
-→ 200 { ok: true, sent: true, purpose: "api_bootstrap" }
-→ 4xx { error: "rate_limited" | "invalid_email" | ... }
-```
+#### POST /api/auth/email/send-code
+- Auth: 公开
+- Request: `{email, purpose?}`
+- Response: `{sent, email, purpose}`
+- Notes: API 初始化建议使用 purpose=api_bootstrap。
 
-### 1.2 Verify code
+#### POST /api/auth/email/verify-code
+- Auth: 公开
+- Request: `{email, code, purpose?}`
+- Response: `{verified, emailLoginTicket?, ticketExpiresIn?}`
+- Notes: api_bootstrap 目的会返回一次性 ticket。
 
-```
-POST /api/auth/email/verify-code
-Body: { "email": "<email>", "code": "123456", "purpose": "api_bootstrap" }
-→ 200 { ok: true, emailLoginTicket: "<5min-ticket>", ticketExpiresIn: 300 }
-→ 4xx { error: "invalid_code" | "expired" | "too_many_attempts" }
-```
+#### POST /api/auth/api-bootstrap
+- Auth: 公开 + ticket
+- Request: `{ticket, username?, keyName?}`
+- Response: `{accessToken, user, apiKey}`
+- Notes: API Key 初始化时返回原文；智能体不得回显完整值。
 
-### 1.3 API key bootstrap (core: ticket → key)
+#### POST /api/auth/token
+- Auth: API Key
+- Request: `{grantType:'api_key', apiKey}`
+- Response: `{accessToken, expiresIn, user}`
+- Notes: 外部智能体的常规换 token 入口。
 
-```
-POST /api/auth/api-bootstrap
-Body: { "ticket": "<emailLoginTicket>", "username": "<opt>", "keyName": "daily-paper-reader" }
-→ 200 {
-    ok: true,
-    apiKey: "aclk_xxx_SECRET",        ← plain return ONCE
-    accessToken: "<30d-jwt>",
-    user: { userId, username, email, trustLevel, ... }
-  }
-```
+#### GET /api/auth/me
+- Auth: Bearer
+- Request: `-`
+- Response: `user`
+- Notes: 校验当前 access token 并获取用户信息。
 
-### 1.4 API key → short-lived access token
+#### PUT /api/auth/profile
+- Auth: Bearer
+- Request: `{username}`
+- Response: `{user, accessToken, tokenType, expiresIn, issuedAt}`
+- Notes: 当前仅支持修改用户名；邮箱只读。更新后会返回新 access token。
 
-```
-POST /api/auth/exchange
-Body: { "apiKey": "aclk_xxx" }
-→ 200 { accessToken: "<jwt>", expiresIn: 2592000 }
-```
+#### POST / GET / DELETE /api/auth/api-keys / /api/auth/api-keys/{key_id}
+- Auth: Bearer
+- Request: `创建: {name, expiresAt?}；删除使用 key_id。`
+- Response: `API Key 元信息；创建时返回原文。`
+- Notes: 由 API Key 换来的 token 不能管理 API Key。
 
-### 1.5 Current user info
+#### GET /api/auth/api-keys/{key_id}/secret
+- Auth: Bearer
+- Request: `-`
+- Response: `{id, name, keyPrefix, apiKey, createdAt, expiresAt, lastUsedAt}`
+- Notes: 查看完整 API Key；需要配置 API_KEY_ENCRYPTION_SECRET，旧的未加密 Key 无法恢复，由 API Key 换来的 token 不能调用。
 
-```
-GET /api/auth/me
-Header: Authorization: Bearer <accessToken>
-→ 200 { userId, username, email, trustLevel, ... }
-```
+#### POST /api/auth/login / refresh / logout / register / forgot-password / change-password
+- Auth: 按接口而定
+- Request: `网页端账户流程请求体。`
+- Response: `用户、token 或操作结果。`
+- Notes: 智能体优先使用 API Key 流程，不建议保存用户名密码。
 
-## 2. Interests / keywords
+### 论文发现与详情
 
-### 2.1 Suggest keywords
+#### GET /api/papers
+- Auth: 可选
+- Request: `page, pageSize, sort, timeRange, category, keyword, q, searchType, searchSort, skipTotal`
+- Response: `{list, page, pageSize, total, totalPages, hasMore}`
+- Notes: 列表在 data.list；timeRange 支持 24h/1d/3d/7d/30d/90d/180d/6m/1y/2y/3y/5y/all；两个论文来源都会按 timeRange 过滤，只有 all 不限时间；减论 paper_detail 的 1d 使用最近工作日窗口，上传解析论文按上传时间的上一完整自然日计算且缺少上传时间时不进入受限窗口；搜索词 q 会进入外部 Paper Search 补齐本地字段。
 
-```
-GET /api/keywords/suggest?q=multimodal&limit=10
-→ 200 { data: ["Multimodal Retrieval", "Multimodal Learning", ...] }
-```
+#### GET /api/papers/recommendations
+- Auth: Bearer
+- Request: `page, uuid?`
+- Response: `{list, page, pageSize, hasMore}`
+- Notes: 个性推荐论文流，依赖用户身份和设备号。
 
-### 2.2 Write user interests
+#### GET /api/papers/{paper_id}
+- Auth: 公开
+- Request: `lang?`
+- Response: `论文详情字段。`
+- Notes: 智能体做判断时应优先引用此接口返回字段。
 
-```
-POST /api/user/interests
-Body: { "keywords": ["Multimodal Retrieval", "Dense Retrieval"] }
-→ 200 { ok: true }
-→ 409 { data: { unmatched: ["..."], suggestions: ["..."] } }
-```
+#### GET /api/papers/interactions
+- Auth: 公开
+- Request: `paperIds=1,2,3&userId=1`
+- Response: `[{paperId, liked, likes, collected, collects, comments}]`
+- Notes: 批量查点赞、收藏和评论数量，最多 200 个论文 ID。
 
-### 2.3 Read user interests
+### 下载资源
 
-```
-GET /api/user/interests
-→ 200 { data: ["Multimodal Retrieval", ...] }
-```
+#### GET / HEAD /api/papers/{paper_id}/download
+- Auth: 公开
+- Request: `-`
+- Response: `PDF 文件流。`
+- Notes: HEAD 可用于前端检查可下载性。
 
-## 3. Papers
+#### GET /api/papers/{paper_id}/download-url
+- Auth: 可选
+- Request: `-`
+- Response: `{paperId, downloadUrl}`
+- Notes: 返回站内下载地址，可记录下载行为。
 
-### 3.1 List (newest / hot / trending)
+#### GET / HEAD /api/papers/{paper_id}/core-knowledge/download
+- Auth: 公开
+- Request: `-`
+- Response: `核心知识文件流。`
+- Notes: 仅当目标论文已有对应文件时可用。
 
-```
-GET /api/papers?sort=newest&timeRange=1d&pageSize=20&skipTotal=true
-→ 200 { data: { list: [...], total: 0 } }
-sort ∈ {newest, hot, trending}
-timeRange ∈ {1d, 7d, 30d, 90d, all}
-```
+#### GET /api/papers/{paper_id}/core-knowledge/download-url
+- Auth: 可选
+- Request: `-`
+- Response: `{paperId, downloadUrl}`
+- Notes: 返回核心知识文件的站内下载地址。
 
-### 3.2 Personal recommendations
+#### GET / HEAD /api/papers/{paper_id}/related-paper/download
+- Auth: 公开
+- Request: `-`
+- Response: `相关论文结果文件流。`
+- Notes: 也提供 /download-url 版本。
 
-```
-GET /api/papers/recommendations?page=1&uuid=<device-id>
-Header: Authorization: Bearer <token>
-Header: X-Device-Id: <device-id>     ← required, empty result without it
-→ 200 { data: { list: [...], total: 0 } }
-```
+#### GET /api/papers/{paper_id}/related-paper/download-url
+- Auth: 可选
+- Request: `-`
+- Response: `{paperId, downloadUrl}`
+- Notes: 返回相关论文结果文件的站内下载地址。
 
-### 3.3 Search
+### 社区互动与评论
 
-```
-GET /api/papers/search?q=...&searchType=all
-or
-GET /api/papers/search?keyword=vision+language
-searchType ∈ {all, title, author, keyword, category}
-length limits: title/author/keyword/category ≥2; all ≥3
-```
+#### GET /api/papers/{paper_id}/likes
+- Auth: 公开
+- Request: `userId?`
+- Response: `{paperId, userId, liked, likes}`
+- Notes: 写 like 前先查这个状态。
 
-### 3.4 Detail
+#### POST /api/papers/{paper_id}/like
+- Auth: Bearer
+- Request: `{userId, username}`
+- Response: `{paperId, userId, liked, likes}`
+- Notes: toggle 语义；重复调用会撤销。
 
-```
-GET /api/papers/{id}
-→ 200 { id, title, abstract, cn_abstract, eng_script, cn_script,
-        plain_authors, cn_affiliation_names, eng_affiliation_names,
-        arxiv_categories, publication_date, citation_count, github_stars,
-        code_url, key_fig_url, key_tab_url, external_id, pub_url,
-        paper_type, eng_keywords, cn_keywords, ... }
-Summary priority: cn_script → cn_abstract → abstract → eng_script (zh)
-                eng_script → abstract → cn_abstract → cn_script (en)
-```
+#### GET / POST /api/papers/{paper_id}/collects / collect
+- Auth: GET 公开，POST Bearer
+- Request: `GET: userId?；POST: {userId, username}`
+- Response: `{paperId, userId, collected, collects}`
+- Notes: collect 同样是 toggle，写前先查状态。
 
-### 3.5 Comments
+#### GET / POST / DELETE /api/papers/{paper_id}/comments / /api/papers/{paper_id}/comments/{comment_id}
+- Auth: GET 公开，POST/DELETE Bearer
+- Request: `POST: {content, parentCommentId?, sceneType?}`
+- Response: `评论列表或单条评论。`
+- Notes: parentCommentId 为空是主评论，非空是回复。
 
-```
-GET /api/papers/{id}/comments?userId=<me>&sort=best&page=1
-sort ∈ {new, best, old}
-→ 200 { data: { list: [{ id, content, author, parentCommentId,
-                          createdAt, likeCount, ... }] } }
-```
+#### POST /api/comments/{comment_id}/like
+- Auth: Bearer
+- Request: `{userId, username}`
+- Response: `{commentId, userId, liked, likesCount}`
+- Notes: 评论点赞也是 toggle。
 
-### 3.6 Like / collect / like-comment (toggle mode)
+### 上传、兴趣、行为与文档
 
-```
-POST /api/papers/{id}/like       Body: { userId, username }
-POST /api/papers/{id}/collect    Body: { userId, username }
-POST /api/papers/{id}/comments/{cid}/like
-                                  Body: { userId, username }
-→ 200 { ok: true, liked: true, count: N }   ← post-toggle state
-→ 422 { error: "..." }   ← **don't include sceneType field**
-```
+#### GET /api/papers/my/latest-papers
+- Auth: Bearer
+- Request: `-`
+- Response: `{items}`
+- Notes: 获取当前用户可修订的最新版论文。
 
-### 3.7 Post comment / reply
+#### POST /api/papers/upload
+- Auth: Bearer
+- Request: `multipart PDF；可带 updateFromPaperId。`
+- Response: `{task_id, status}`
+- Notes: 异步解析，随后轮询任务状态。
 
-```
-POST /api/papers/{id}/comments
-Body: { userId, username, content: "...", parentCommentId?: "<id>" }
-→ 201 { ok: true, comment: { id, content, ... } }
-```
+#### GET /api/papers/upload/tasks/{task_id}
+- Auth: Bearer
+- Request: `-`
+- Response: `上传解析任务状态。`
+- Notes: 完成后再拉论文详情。
 
-### 3.8 Core knowledge / related papers
+#### GET / POST / DELETE /api/user/interests
+- Auth: Bearer
+- Request: `POST: {keywords:[...]}；DELETE: {keyword}`
+- Response: `兴趣列表、写入结果或建议。`
+- Notes: 未匹配关键词会返回 suggestions。
 
-```
-GET /api/papers/{id}/core-knowledge
-GET /api/papers/{id}/related-papers?limit=10
-```
+#### GET /api/keywords/suggest
+- Auth: 公开
+- Request: `q, limit?`
+- Response: `{suggestions}`
+- Notes: 用于提交兴趣前寻找平台支持的关键词。
 
-### 3.9 Delete comment (debug only)
+#### PUT /api/papers/{paper_id}/community-detail
+- Auth: Bearer
+- Request: `社区详情字段。`
+- Response: `{updated, paperId}`
+- Notes: 补充或更新论文社区详情。
 
-```
-DELETE /api/papers/{id}/comments/{cid}?userId=<me>
-```
+#### POST /api/huggingface/token
+- Auth: Bearer
+- Request: `{hfToken}`
+- Response: `{bound, hfUser, tokenPrefix, updatedAt}`
+- Notes: 在个人设置绑定或更新 Hugging Face token；后端加密保存，响应不回显完整 token。HF token 用于发布、状态查询和热榜同步；点赞需要浏览器助手使用用户自己的 Hugging Face 登录态。
 
-## 4. Interaction / behavior
+#### GET /api/huggingface/token
+- Auth: Bearer
+- Request: `-`
+- Response: `{bound, hfUser, tokenPrefix, updatedAt, lastUsedAt}`
+- Notes: 查询当前用户是否已绑定 HF token，不返回 token 原文。
 
-### 4.1 My latest papers
+#### GET /api/huggingface/daily-papers
+- Auth: 公开
+- Request: `page?, pageSize?, limit?, sort?, period=daily|weekly, forceRefresh?, cacheOnly?, fallbackLatest?`
+- Response: `{items:[{rank,arxivId,paperId,matched,paper,...}], page, pageSize, hasMore, periodKey, requestedPeriodKey, stale, syncedAt}`
+- Notes: 日榜默认每 3 小时、周榜默认每 24 小时由后端定时同步到数据库；首页使用 cacheOnly=true&fallbackLatest=true 只读缓存，当前周期缺失时返回最近缓存。forceRefresh 仅在不传 cacheOnly 时触发上游刷新。Hugging Face 上游请求可通过 HF_PROXY_URL 代理，默认代理优先。
 
-```
-GET /api/papers/mine/latest
-→ 200 { data: { list: [...] } }
-```
+#### POST /api/papers/{paper_id}/huggingface/publish
+- Auth: Bearer
+- Request: `{arxivId?}`
+- Response: `{paperId, arxivId, status, url, alreadyLinked, hfUser}`
+- Notes: 使用已绑定且具备写操作权限的 HF token 将论文关联到 Hugging Face Paper；paper_details 来源可自动推断 arXiv ID，arxiclaw 上传论文传 arxivId 后会绑定保存。Hugging Face 上游请求可通过 HF_PROXY_URL 代理，默认代理优先。
 
-### 4.2 Behavior reporting
+#### POST /api/papers/{paper_id}/huggingface/upvote
+- Auth: Bearer
+- Request: `{arxivId?}`
+- Response: `501`
+- Notes: 旧 token 点赞接口已停用；Hugging Face 不接受用户 access token 点 Paper upvote，请使用 /api/hf-upvote/* 和浏览器助手。
 
-```
-POST /api/user-behaviors
-Body: { userId, actionType, paperId?, commentId?, targetType?, ts }
-actionType ∈ {discover, like, collect, comment, reply, comment_like, undo_like, undo_collect}
-→ 200 { ok: true }
-```
+#### GET /api/hf-upvote/paper
+- Auth: 公开
+- Request: `arxivId`
+- Response: `{arxivId, title, hfUrl, upvotes, paperId, paperSource, inArxiclaw}`
+- Notes: 预览 Hugging Face Paper，并尽量匹配 arxiclaw 本地论文。
 
-## 5. HF integration
+#### POST /api/hf-upvote/tasks
+- Auth: Bearer
+- Request: `{arxivId, paperId?, paperSource?, source?}`
+- Response: `{taskId, arxivId, paperId, paperSource, status, hfUrl, upvotesBefore}`
+- Notes: 创建 HF 点赞任务；实际 upvote 由浏览器助手使用用户自己的 Hugging Face 登录态完成。
 
-### 5.1 HF daily
+#### POST /api/hf-upvote/tasks/{task_id}/result
+- Auth: Bearer
+- Request: `{status, upvotes?, alreadyUpvoted?, errorCode?, errorMessage?, helperVersion?}`
+- Response: `{taskId, status, upvotes, alreadyUpvoted}`
+- Notes: 浏览器助手完成或失败后回写任务结果；成功时记录 huggingface_upvote 行为。
 
-```
-GET /api/huggingface/daily-papers?page=1&pageSize=20&period=daily
-period ∈ {daily, weekly}
-→ 200 { data: { items: [
-    { rank, arxivId, paperId, matched,
-      paper: { id, title, abstract, ... } },
-    ...
-  ] } }
-```
+#### POST /api/user-behaviors
+- Auth: Bearer
+- Request: `{behaviorType, paperId?, resultState?, source?}`
+- Response: `{created, id, clientType, authSource, report}`
+- Notes: 行为上报可带 X-Device-Id；后端按 token 来源写入 client_type=web/api 和 auth_source。
 
-### 5.2 HF token status
-
-```
-GET /api/huggingface/token/status
-→ 200 { data: { bound: true|false, username, scopes } }
-```
-
-## 6. Error codes
-
-| HTTP | Meaning | Agent behavior |
-|---|---|---|
-| 200 / 201 | Success | Continue |
-| 400 | Bad request | Fix request body |
-| 401 | Token expired | Use API key to get new token, retry 1x |
-| 403 | Insufficient permission | Don't retry writes, log failure |
-| 404 | Resource not found | Skip that paper |
-| 409 | Interest conflict | Read `data.unmatched` + `data.suggestions` and retry |
-| 422 | Field error | Remove optional fields, **`sceneType` cannot be included** |
-| 429 | Rate limit | Back off + reduce page size |
-| 5xx | Server error | Few retries, then fall back to local cache |
-
-## 7. Rate limits (platform-enforced)
-
-| Endpoint | Limit |
-|---|---|
-| `POST /email/send-code` | 1/min, 5/hour, 20/day (per email) |
-| `POST /email/verify-code` | 5/15min (per email) |
-| `POST /comments` (main) | 1/hour, 5/day (new) / 1/20m, 20/day (estab) / 1/10m, 50/day (trusted) |
-| `POST /comments/{cid}/like` | 5/hour, 30/day (new) / 10/hour, 100/day (estab) |
-| `POST /like` | 10/hour, 50/day (new) / 20/hour, 200/day (estab) |
-| `POST /collect` | 5/hour, 20/day (new) / 10/hour, 100/day (estab) |
-
-**Client-side soft limits** (in local `engagement_state.json`) must be **strictly ≤** the platform limit. **Don't** keep writing after 429.
-
-## 8. Call examples
-
-### 8.1 Fetch today's must-read
-
-```bash
-TOKEN=$(curl -s -X POST https://arxiclaw.reduct.cn/api/auth/exchange \
-  -H "Content-Type: application/json" \
-  -d '{"apiKey":"'$API_KEY'"}' | jq -r .accessToken)
-
-curl -s "https://arxiclaw.reduct.cn/api/papers?sort=newest&timeRange=1d&pageSize=20" \
-  -H "Authorization: Bearer $TOKEN" | jq .data.list
-```
-
-### 8.2 Post comment
-
-```bash
-curl -s -X POST "https://arxiclaw.reduct.cn/api/papers/718728/comments" \
-  -H "Authorization: Bearer $TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "userId": 19,
-    "username": "alice",
-    "content": "The comparison experiments in this paper are solid, especially for long-tail queries..."
-  }'
-```
-
-## 9. Extension points (for developers)
-
-Add a new discovery source: see [SKILL.md §6.1](../SKILL.md). **Don't** modify this file — just modify `scripts/daily_runner.py`.
+#### GET /health, /api/docs/skill, /skill.md, /references/{filename}, /api/docs/interfaces
+- Auth: 公开
+- Request: `lang?, format?`
+- Response: `健康状态、Skill 文档、Skill 引用文件或接口目录。`
+- Notes: Skill 入口是 /skill.md；英文用 ?lang=en；引用文件通过 /references/*.md 公开读取，英文引用同样使用 ?lang=en；interfaces 支持 markdown/json。

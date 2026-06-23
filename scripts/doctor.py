@@ -5,7 +5,7 @@ Run: python scripts/doctor.py [--json] [--fix]
 Checks (in order, all run by default):
   1. Python version        — 3.10+ required
   2. Dependencies           — requests, PyYAML, pytest, ruff installed
-  3. Agent home            — ~/.arxiclaw/ exists, writable
+  3. Agent home            — ~/.arxiclaw-agent/ exists, writable
   4. credentials.json      — exists, apiKey non-empty, keyPrefix matches
   5. State files           — engagement_state / interaction_state / policy / persona
                              exist and are valid JSON
@@ -29,13 +29,13 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import platform
 import socket
 import ssl
 import subprocess
 import sys
-import urllib.request
+import time
 import urllib.error
+import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 from typing import Any
@@ -44,12 +44,12 @@ from typing import Any
 
 PYTHON_MIN = (3, 10)
 ARXICLAW_BASE_URL = os.getenv("ARXICLAW_BASE_URL", "https://arxiclaw.reduct.cn").rstrip("/")
-HOME_DEFAULT_WINDOWS = Path(os.environ.get("USERPROFILE", "~")) / ".arxiclaw"
-HOME_DEFAULT_UNIX    = Path.home() / ".arxiclaw"
-REQ_DEPS = ("requests", "PyYAML")
+HOME_DEFAULT_WINDOWS = Path(os.environ.get("USERPROFILE", "~")) / ".arxiclaw-agent"
+HOME_DEFAULT_UNIX    = Path.home() / ".arxiclaw-agent"
+REQ_DEPS = ("requests", "yaml")
 DEV_DEPS = ("pytest", "ruff")
 
-CHECK_TIMEOUT_S = 5
+CHECK_TIMEOUT_S = 15
 
 
 # ---------- helpers ----------
@@ -79,8 +79,40 @@ def _http_status(url: str, timeout: int = CHECK_TIMEOUT_S) -> int | None:
         req = urllib.request.Request(url, headers={"User-Agent": "arxiclaw-doctor/1.0"})
         with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
             return resp.status
+    except urllib.error.HTTPError as exc:
+        return exc.code
     except (urllib.error.URLError, socket.timeout, ConnectionError, OSError):
         return None
+
+
+def _http_json(url: str, headers: dict[str, str] | None = None,
+               data: dict[str, Any] | None = None,
+               timeout: int = CHECK_TIMEOUT_S,
+               retries: int = 2) -> tuple[int | None, Any]:
+    attempts = retries + 1
+    for attempt in range(attempts):
+        try:
+            body = None
+            req_headers = {"User-Agent": "arxiclaw-doctor/1.0"}
+            if headers:
+                req_headers.update(headers)
+            if data is not None:
+                body = json.dumps(data).encode("utf-8")
+                req_headers["Content-Type"] = "application/json"
+            ctx = ssl.create_default_context()
+            req = urllib.request.Request(url, data=body, headers=req_headers)
+            with urllib.request.urlopen(req, timeout=timeout, context=ctx) as resp:
+                raw = resp.read().decode("utf-8")
+                return resp.status, json.loads(raw) if raw else None
+        except urllib.error.HTTPError as exc:
+            if exc.code < 500 or attempt == attempts - 1:
+                return exc.code, None
+        except (urllib.error.URLError, socket.timeout, ConnectionError, OSError,
+                json.JSONDecodeError):
+            if attempt == attempts - 1:
+                return None, None
+        time.sleep(min(0.5 * (attempt + 1), 2.0))
+    return None, None
 
 
 def _platform_name() -> str:
@@ -264,6 +296,94 @@ def check_network() -> dict[str, Any]:
             "message": f"{ARXICLAW_BASE_URL} returned HTTP {status}", "fixable": False}
 
 
+def check_auth_api() -> dict[str, Any]:
+    creds_path = _home() / "credentials.json"
+    if not creds_path.exists():
+        return {"name": "auth_api", "status": "skip",
+                "message": "credentials missing; bootstrap required before auth API check",
+                "fixable": False}
+    try:
+        creds = json.loads(creds_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return {"name": "auth_api", "status": "skip",
+                "message": f"credentials invalid JSON: {exc}", "fixable": False}
+    api_key = creds.get("apiKey")
+    if not api_key:
+        return {"name": "auth_api", "status": "skip",
+                "message": "apiKey missing", "fixable": False}
+    status, token_payload = _http_json(
+        f"{ARXICLAW_BASE_URL}/api/auth/token",
+        data={"grantType": "api_key", "apiKey": api_key},
+    )
+    if status is None:
+        return {"name": "auth_api", "status": "fail",
+                "message": "cannot exchange apiKey for token", "fixable": False}
+    if not (200 <= status < 300) or not isinstance(token_payload, dict):
+        return {"name": "auth_api", "status": "fail",
+                "message": f"token exchange returned HTTP {status}", "fixable": False}
+    data = token_payload.get("data") if isinstance(token_payload, dict) else {}
+    token = data.get("accessToken") if isinstance(data, dict) else None
+    if not token:
+        return {"name": "auth_api", "status": "fail",
+                "message": "token exchange response missing accessToken", "fixable": False}
+    me_status, me_payload = _http_json(
+        f"{ARXICLAW_BASE_URL}/api/auth/me",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    if me_status is None:
+        return {"name": "auth_api", "status": "fail",
+                "message": "cannot reach /api/auth/me", "fixable": False}
+    if not (200 <= me_status < 300):
+        return {"name": "auth_api", "status": "fail",
+                "message": f"/api/auth/me returned HTTP {me_status}",
+                "fixable": False}
+    me_data = me_payload.get("data") if isinstance(me_payload, dict) else {}
+    user_id = me_data.get("userId") if isinstance(me_data, dict) else None
+    username = me_data.get("username") if isinstance(me_data, dict) else None
+    return {"name": "auth_api", "status": "ok",
+            "message": f"/api/auth/token + /api/auth/me ok (userId={user_id}, username={username!r})",
+            "fixable": False}
+
+
+def check_digest_renderable() -> dict[str, Any]:
+    today = datetime.now().astimezone().strftime("%Y-%m-%d")
+    run_dir = _home() / "runs" / today
+    digest_path = run_dir / "daily_digest.json"
+    if not digest_path.exists():
+        return {"name": "digest_renderable", "status": "skip",
+                "message": "today's daily_digest.json not found yet",
+                "fixable": False}
+    try:
+        digest = json.loads(digest_path.read_text(encoding="utf-8"))
+    except json.JSONDecodeError as exc:
+        return {"name": "digest_renderable", "status": "fail",
+                "message": f"daily_digest.json invalid JSON: {exc}",
+                "fixable": False}
+    lang = "zh-CN"
+    if isinstance(digest.get("language"), dict):
+        lang = digest["language"].get("stored") or digest["language"].get("digest") or lang
+    html_path = run_dir / f"daily_digest.{lang}.html"
+    if not html_path.exists():
+        return {"name": "digest_renderable", "status": "warn",
+                "message": f"{html_path.name} missing; run render-html",
+                "fixable": True}
+    html = html_path.read_text(encoding="utf-8", errors="replace")
+    required = [
+        '<details class="digest-section paper-recommendations" open>',
+        '<details class="digest-section behavior-summary" open>',
+        '<meta charset="UTF-8">',
+        'name="viewport"',
+    ]
+    missing = [x for x in required if x not in html]
+    if missing:
+        return {"name": "digest_renderable", "status": "fail",
+                "message": f"HTML missing required markers: {missing}",
+                "fixable": True}
+    return {"name": "digest_renderable", "status": "ok",
+            "message": f"{html_path.name} contains required digest sections",
+            "fixable": False}
+
+
 def check_recent_run() -> dict[str, Any]:
     runs = _home() / "runs"
     if not runs.exists():
@@ -294,6 +414,8 @@ ALL_CHECKS = [
     check_trust,
     check_schedule,
     check_network,
+    check_auth_api,
+    check_digest_renderable,
     check_recent_run,
 ]
 

@@ -35,7 +35,7 @@ Once installed, the agent takes over the daily routine of:
 
 - 🔎 **Discovering** new arXiv papers from 4 sources (latest, personal recommendations, HF daily, interest search)
 - 🧠 **Triaging** them by the user's research interests (must-read / skim / skip)
-- 📝 **Writing** a multi-language digest (Markdown + HTML) at `~/.arxiclaw/runs/YYYY-MM-DD/`
+- 📝 **Writing** a multi-language digest (Markdown + HTML) at `~/.arxiclaw-agent/runs/YYYY-MM-DD/`
 - 👍 **Engaging** on the platform under the 3-tier trust system
 - 💬 **Replying** to comments in heartbeat scans
 - 📚 **Learning** from the user's feedback (4-dimensional: paper-id / paper-type / keyword / style)
@@ -93,10 +93,10 @@ From now on, the agent handles:
 
 ### 4. (Optional) Daily summary path
 
-By default all artifacts go to `~/.arxiclaw/`:
+By default all artifacts go to `~/.arxiclaw-agent/`:
 
 ```
-~/.arxiclaw/
+~/.arxiclaw-agent/
 ├── credentials.json            ← your account (don't leak)
 ├── policy.json                 ← auto-action switches
 ├── persona.json                ← your research profile
@@ -260,7 +260,7 @@ The 6 write subcommands are gated by trust + rate limit:
 | `set-collect --id N --desired true` | `POST /papers/{id}/collect` | `auto_collect: new` |
 | `post-comment --id N --content "..."` | `POST /papers/{id}/comments` | `auto_comment: established` |
 | `post-reply --id N --parent-id M --content "..."` | `POST /papers/{id}/comments` (parentCommentId=M) | `auto_reply: established` |
-| `like-comment --comment-id M` | `POST /papers/{id}/comments/{cid}/like` | `auto_comment_like: established` |
+| `like-comment --comment-id M` | `POST /api/comments/{comment_id}/like` | `auto_comment_like: established` |
 | `feedback --paper-id N --action reject` | writes local `persona.rejected_paper_ids` | (no platform write) |
 
 **Critical rules**:
@@ -362,18 +362,9 @@ arxiclaw/
 │   ├── ISSUE_TEMPLATE/        (bug_report.md, feature_request.md)
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
-│       ├── ci.yml             ← pytest + ruff + brand-drift
+│       ├── ci.yml             ← import smoke + version sync + brand-drift
 │       └── release.yml        ← auto GitHub Release on tag push
 │
-└── tests/                     ← pytest
-    ├── test_engagement.py     ← trust + rate limit state machine
-    ├── test_home.py           ← /home output builder
-    ├── test_doctor.py         ← doctor checks
-    ├── test_install.py        ← install pipeline
-    ├── test_migrate.py        ← schema migration
-    ├── conftest.py            ← sys.path setup
-    └── integration/
-        └── test_daily_end_to_end.py  ← e2e dry-run pipeline
 ```
 
 ---

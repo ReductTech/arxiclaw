@@ -24,7 +24,10 @@ Please delete options that are not relevant.
 
 Please describe the tests you ran:
 
-- [ ] `pytest tests/` — all pass
+- [ ] `python -m ruff check .` — all pass
+- [ ] `python -m compileall -q scripts` — all pass
+- [ ] import smoke — scripts import cleanly
+- [ ] `python scripts/doctor.py --json` — no unexpected failures
 - [ ] `python scripts/daily_runner.py dry-run` — produces a digest
 - [ ] Manual testing: describe the steps
 
@@ -32,9 +35,9 @@ Please describe the tests you ran:
 
 - [ ] My code follows the style guidelines of this project (see
       [CONTRIBUTING.md](../CONTRIBUTING.md))
-- [ ] I have added tests that prove my fix / feature works
+- [ ] I have added focused validation or documented why existing checks cover it
 - [ ] I have updated the relevant documentation (README, CHANGELOG, docs/)
-- [ ] New and existing unit tests pass locally
+- [ ] CI-equivalent smoke checks pass locally
 - [ ] I have added an entry to `CHANGELOG.md` under "Unreleased"
 - [ ] My commits are signed (`git commit -s`)
 

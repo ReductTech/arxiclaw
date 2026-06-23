@@ -28,10 +28,12 @@ make doctor           # or: python scripts/doctor.py
 make daily            # or: python scripts/daily_runner.py
 
 # Dev loop (run after every code change)
-make dev              # = pytest + ruff
+python -m ruff check .
+python -m compileall -q scripts
+python scripts/doctor.py --json
 ```
 
-**If you are helping an existing user** (someone with `~/.arxiclaw/credentials.json`):
+**If you are helping an existing user** (someone with `~/.arxiclaw-agent/credentials.json`):
 
 ```bash
 # Just diagnose, then act
@@ -46,7 +48,9 @@ make doctor --json    # read the JSON, decide what to do
 $EDITOR scripts/some_file.py
 
 # 2. Validate
-make dev              # pytest + ruff
+python -m ruff check .
+python -m compileall -q scripts
+python scripts/doctor.py --json
 
 # 3. Sync docs (if you changed trust/rate-limit/scheduling/commenting/api)
 #    → see [SKILL.md §9 Maintenance](SKILL.md)
@@ -95,13 +99,6 @@ arxiclaw/
 │   ├── scheduler.md       ← 3-platform scheduling implementation
 │   └── trust.md           ← 3-tier trust design + extension points
 │
-├── tests/                ← pytest
-│   ├── test_engagement.py
-│   ├── test_home.py
-│   ├── test_doctor.py     ← doctor
-│   ├── test_install.py    ← install
-│   └── test_migrate.py    ← migrate
-│
 ├── examples/             ← templates copied on first bootstrap
 │   ├── credentials.example.json
 │   ├── policy.example.json
@@ -111,7 +108,7 @@ arxiclaw/
 │   ├── ISSUE_TEMPLATE/
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
-│       ├── ci.yml         ← pytest + ruff + brand-drift check
+│       ├── ci.yml         ← import smoke + version sync + brand-drift
 │       └── release.yml    ← ★ auto-release on tag push (optional)
 │
 └── docs/                 ← multi-language READMEs + logo
@@ -131,7 +128,7 @@ USER SAYS SOMETHING
        │
        ▼
 [Has user been bootstrapped?]
-   │  check ~/.arxiclaw/credentials.json
+   │  check ~/.arxiclaw-agent/credentials.json
    │
    ├─ NO  → load SKILL.md §0  →  multi-turn bootstrap
    │
@@ -169,7 +166,9 @@ USER SAYS SOMETHING
 After any change:
 
 ```bash
-make dev              # pytest + ruff
+python -m ruff check .
+python -m compileall -q scripts
+python -c "import sys; sys.path.insert(0, 'scripts'); import engagement, home, behavior_report, doctor, install, upgrade, migrate; print('imports OK')"
 make doctor           # ensure the change doesn't break environment
 ```
 
@@ -226,7 +225,7 @@ If upgrade fails: it **rolls back** to the previous commit. Tell the user
 
 ### 5.3 Help a user customize the agent
 
-1. Read `~/.arxiclaw/policy.json`
+1. Read `~/.arxiclaw-agent/policy.json`
 2. Explain the available toggles
 3. Update the field the user wants
 4. Re-run `make doctor` to confirm
@@ -244,7 +243,7 @@ python scripts/daily_runner.py paper-detail --id <N> --lang zh
 python scripts/daily_runner.py paper-comments --id <N>
 
 # Why was this paper skipped?
-grep -A 5 '"id": <N>' ~/.arxiclaw/runs/<date>/daily_digest.json
+grep -A 5 '"id": <N>' ~/.arxiclaw-agent/runs/<date>/daily_digest.json
 
 # Re-include this paper
 python scripts/daily_runner.py feedback --paper-id <N> --action accept
@@ -275,7 +274,7 @@ example) and follow its style.
 ❌ Don't bypass trust gates — even for "obvious" cases
 ❌ Don't modify `engagement.py` rate limits without also updating `references/trust.md` and SKILL.md §3
 ❌ Don't commit `runs/`, `credentials.json`, `persona.json` — they're in `.gitignore`
-❌ Don't push to `main` without `make dev` passing
+❌ Don't push to `main` without ruff, compileall, doctor, and CI smoke passing
 
 ---
 

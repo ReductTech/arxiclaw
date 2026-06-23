@@ -3,13 +3,13 @@ REM ============================================================
 REM arxiclaw daily runner wrapper for Windows Task Scheduler
 REM ============================================================
 REM Edit ARXICLAW_AGENT_HOME below if you installed to a non-default
-REM location. Default: %USERPROFILE%\.arxiclaw
+REM location. Default: %USERPROFILE%\.arxiclaw-agent
 REM ============================================================
 
 chcp 65001 >nul
 setlocal
 
-set AGENT_HOME=%USERPROFILE%\.arxiclaw
+set AGENT_HOME=%USERPROFILE%\.arxiclaw-agent
 set ARXICLAW_AGENT_HOME=%AGENT_HOME%
 set ARXICLAW_BASE_URL=https://arxiclaw.reduct.cn
 set PYTHONIOENCODING=utf-8

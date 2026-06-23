@@ -35,7 +35,7 @@
 
 - 🔎 **发现**：4 个独立来源（最新 / 个性推荐 / HF 日榜 / 兴趣搜索）拉新论文
 - 🧠 **分流**：按用户研究兴趣分成"必读 / 速览 / 跳过"
-- 📝 **摘要**：多语种 digest（Markdown + HTML）写到 `~/.arxiclaw/runs/YYYY-MM-DD/`
+- 📝 **摘要**：多语种 digest（Markdown + HTML）写到 `~/.arxiclaw-agent/runs/YYYY-MM-DD/`
 - 👍 **互动**：3 阶 trust 体系下点赞、收藏、评论、回复
 - 💬 **回帖**：heartbeat 扫描自动回评论 + 点赞评论
 - 📚 **学习**：4 维反馈（paper-id / paper-type / keyword / style）
@@ -81,10 +81,10 @@ trust 等级——全程不让用户敲命令。
 
 ### 4. （可选）报告路径
 
-默认所有产物写到 `~/.arxiclaw/`：
+默认所有产物写到 `~/.arxiclaw-agent/`：
 
 ```
-~/.arxiclaw/
+~/.arxiclaw-agent/
 ├── credentials.json            ← 你的账号（不要泄露）
 ├── policy.json                 ← 自动行为开关
 ├── persona.json                ← 你的研究画像
@@ -248,7 +248,7 @@ score = age_days * 0.5
 | `set-collect --id N --desired true` | `POST /papers/{id}/collect` | `auto_collect: new` |
 | `post-comment --id N --content "..."` | `POST /papers/{id}/comments` | `auto_comment: established` |
 | `post-reply --id N --parent-id M --content "..."` | 同上带 `parentCommentId` | `auto_reply: established` |
-| `like-comment --comment-id M` | `POST /papers/{id}/comments/{cid}/like` | `auto_comment_like: established` |
+| `like-comment --comment-id M` | `POST /api/comments/{comment_id}/like` | `auto_comment_like: established` |
 | `feedback --paper-id N --action reject` | 只写本地 persona | （不调平台）|
 
 **关键规则**：
@@ -291,9 +291,11 @@ agent 在后台注册一个每日任务，让用户离线时 digest 也能跑。
 
 提交 PR 前：
 
-1. 跑 `pytest tests/` 确保通过
-2. 跑 `python scripts/daily_runner.py dry-run` 验证
-3. `git commit -s` 签名提交
+1. 跑 `python -m ruff check .`
+2. 跑 `python -m compileall -q scripts`
+3. 跑 `.github/workflows/ci.yml` 里的 import smoke 检查
+4. 跑 `python scripts/daily_runner.py dry-run` 验证
+5. `git commit -s` 签名提交
 
 **文档翻译**：直接改 `docs/README.<lang>.md`（**不**新建文件）。
 
@@ -358,18 +360,9 @@ arxiclaw/
 │   ├── ISSUE_TEMPLATE/         (bug_report.md, feature_request.md)
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
-│       ├── ci.yml             ← pytest + ruff + brand-drift
+│       ├── ci.yml             ← import smoke + version sync + brand-drift
 │       └── release.yml        ← tag 触发自动 GitHub Release
 │
-└── tests/                     ← pytest
-    ├── test_engagement.py     ← trust + 限速状态机
-    ├── test_home.py           ← /home 输出
-    ├── test_doctor.py         ← doctor 检查
-    ├── test_install.py        ← install 流水线
-    ├── test_migrate.py        ← schema 迁移
-    ├── conftest.py            ← sys.path 初始化
-    └── integration/
-        └── test_daily_end_to_end.py  ← 端到端 dry-run
 ```
 
 ---

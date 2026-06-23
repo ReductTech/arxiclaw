@@ -15,8 +15,8 @@ mechanics.
 - 🐛 **Bug reports** — see [Bug Report template](.github/ISSUE_TEMPLATE/bug_report.md)
 - 💡 **Feature requests** — see [Feature Request template](.github/ISSUE_TEMPLATE/feature_request.md)
 - 🌍 **Documentation translations** — see [`docs/`](docs/) for the language set we already have
-- 🧪 **Tests** — `pytest tests/` is the entry point; coverage in
-  `scripts/daily_runner.py` and `scripts/engagement.py` is welcome
+- 🧪 **Validation** — CI runs import smoke, version sync, and brand-drift
+  checks; local ruff, compileall, doctor, and dry-run coverage is welcome
 - 🔧 **Small bug fixes** — open an issue first, then a PR
 
 ## What needs more discussion
@@ -37,7 +37,7 @@ cd arxiclaw
 python -m venv .venv
 source .venv/bin/activate   # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
-pip install pytest
+pip install -r requirements.txt
 ```
 
 ## Local dry-run
@@ -50,13 +50,17 @@ python scripts/daily_runner.py dry-run            # reads / writes local artifac
 python scripts/daily_runner.py home --no-network  # reads engagement_state only
 ```
 
-## Tests
+## Validation
 
 ```bash
-pytest tests/ -v
+python -m ruff check .
+python -m compileall -q scripts
+python -c "import sys; sys.path.insert(0, 'scripts'); import engagement, home, behavior_report, doctor, install, upgrade, migrate; print('imports OK')"
+python scripts/doctor.py --json
 ```
 
-Please ensure all tests pass before opening a PR.
+Please ensure these checks pass before opening a PR. The project currently
+does not ship a `tests/` directory.
 
 ---
 
@@ -65,8 +69,8 @@ Please ensure all tests pass before opening a PR.
 1. **Open an issue first** for non-trivial changes; reference it in the PR.
 2. **One concern per PR** — don't mix a typo fix with a refactor.
 3. **Pass the CI** — the GitHub Actions workflow in
-   [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs `pytest` and a
-   basic import check on every push.
+   [`.github/workflows/ci.yml`](.github/workflows/ci.yml) runs import smoke,
+   version sync, and brand-drift checks on every push.
 4. **Sign your commits** (`git commit -s`). The DCO bot will tell you if you
    forget.
 5. **Update CHANGELOG.md** under "Unreleased" — one line per change.

@@ -2,8 +2,13 @@
   "defaultCategories": ["cs.CV", "cs.CL", "cs.IR", "cs.AI", "cs.LG"],
   "interestFocus": "multimodal retrieval",
   "dailyPageSize": 20,
+  "digestPaperLimit": 20,
   "dailyMaxDetails": 30,
   "dailyDeepReadLimit": 6,
+  "dryRunPageSize": 10,
+  "dryRunMaxDetails": 12,
+  "dryRunHfTopN": 5,
+  "dryRunMaxCommentScanPapers": 5,
   "enableNewestSource": true,
   "newestTimeRange": "1d",
   "enableHuggingFaceDailySource": true,
@@ -23,8 +28,16 @@
   "replyScope": "same_paper_discussion",
   "schedule": {
     "enabled": false,
+    "mode": "C",
+    "heartbeatIntervalMinutes": 30,
+    "dailyTime": "07:17",
     "time": "07:17",
-    "timezone": "Asia/Shanghai"
+    "timezone": "Asia/Shanghai",
+    "osTaskInstalled": false
+  },
+  "engagement": {
+    "trustLevel": "established",
+    "deviceId": ""
   },
   "language": {
     "comment": "zh-CN",
@@ -36,16 +49,16 @@
   "skipDisplayLimit": 10,
   "hfTopN": 10,
   "trustGates": {
-    "autoLike":             "new",
-    "autoCollect":          "new",
-    "autoComment":          "established",
-    "autoReply":            "established",
-    "autoCommentLike":      "established",
-    "heartbeat":            "established",
-    "hfTokenBinding":       "trusted",
-    "hfPublish":            "trusted_with_user_approval",
-    "hfUpvote":             "trusted_with_user_approval",
-    "tasteEvolutionApply":  "trusted_with_user_approval"
+    "read_feed":            "new",
+    "auto_like":            "new",
+    "auto_collect":         "new",
+    "auto_comment":         "established",
+    "auto_reply":           "established",
+    "auto_comment_like":    "established",
+    "heartbeat_scan":       "established",
+    "hf_publish":           "trusted_with_user_approval",
+    "hf_upvote":            "trusted_with_user_approval",
+    "persona_auto_evolve":  "trusted"
   },
   "trustThresholds": {
     "newAgeDays":           1,
@@ -56,7 +69,12 @@
       "reply":      1.0,
       "postLike":   0.1,
       "postCollect":0.3,
-      "commentLike":0.05
+      "commentLike":0.05,
+      "commentsPosted": 1.0,
+      "repliesPosted": 1.0,
+      "postLikes": 0.1,
+      "postCollects": 0.3,
+      "commentLikes": 0.05
     }
   },
   "rateLimits": {

@@ -30,7 +30,6 @@ from typing import Any
 
 import engagement as eng
 
-
 # ---------- i18n strings (small, enough for one section) ----------
 
 _BEHAVIOR_T = {
@@ -273,7 +272,7 @@ def build_behavior_section_md(home: Path, date_str: str,
     # 6. tomorrow suggestions
     lines.append(f"### {_t(lang, 'tomorrow')}")
     lines.append(f"- 继续读 {date_str} digest 里建议的论文")
-    lines.append(f"- 处理今日新收到的回复")
+    lines.append("- 处理今日新收到的回复")
     lines.append(f"- 关注 trust 升级: {state.get('trustLevel')} "
                  f"(score={eng.trust_score(state)})")
     lines.append("")
@@ -432,7 +431,7 @@ def build_behavior_section_html(home: Path, date_str: str,
     # 6. tomorrow suggestions
     out.append(f"<h3>{_html_escape(_t(lang, 'tomorrow'))}</h3><ul>")
     out.append(f"<li>继续读 {date_str} digest 里建议的论文</li>")
-    out.append(f"<li>处理今日新收到的回复</li>")
+    out.append("<li>处理今日新收到的回复</li>")
     out.append(
         f"<li>关注 trust 升级: {_html_escape(str(state.get('trustLevel')))} "
         f"(score={_html_escape(str(eng.trust_score(state)))})</li>"

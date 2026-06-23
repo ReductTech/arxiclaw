@@ -1,11 +1,11 @@
-# Policy & State Reference (for developers)
+﻿# Policy & State Reference (for developers)
 
 > **This file is for developers / extenders.** End users will not read this file.
 
 ## 1. Default agent home
 
-- Windows: `%USERPROFILE%\.arxiclaw`
-- Unix:    `~/.arxiclaw`
+- Windows: `%USERPROFILE%\.arxiclaw-agent`
+- Unix:    `~/.arxiclaw-agent`
 - Overridable via `ARXICLAW_AGENT_HOME` env var
 
 ## 2. credentials.json
@@ -119,6 +119,10 @@
 |---|---|
 | `dailyPageSize` | Papers per source per pull (newest/recommendations/HF/interest each independent) |
 | `dailyMaxDetails` | Detail-fetch cap (after dedup) |
+| `dryRunPageSize` | Dry-run per-source page-size cap (default 10) |
+| `dryRunMaxDetails` | Dry-run detail-fetch cap (default 12) |
+| `dryRunHfTopN` | Dry-run HF top-N cap (default 5) |
+| `dryRunMaxCommentScanPapers` | Dry-run comment-thread scan cap (default 5) |
 | `enableNewestSource` | Whether to enable "newest 1d" source |
 | `newestTimeRange` | newest timeRange (default `1d`) |
 | `searchMode` | `auto` / `keyword` / `q` |

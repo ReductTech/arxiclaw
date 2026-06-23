@@ -17,6 +17,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
 ### Changed
 
 - README.md redesigned for open-source release (logo + i18n + features + quick-start)
+- Publication readiness docs now use the current CI baseline: import smoke,
+  version sync, brand-drift, ruff, compileall, doctor, and dry-run.
+- `daily_runner.py dry-run` now bounds discovery/detail/comment scanning and
+  records the applied limits in `heartbeat_summary.sourceStatus`.
+
+### Fixed
+
+- Fixed mojibake in daily digest action summaries and behavior-report comments.
+- Removed stale `pytest tests/` release instructions from user-facing docs.
 
 ## [0.3.1] — 2026-06-04
 

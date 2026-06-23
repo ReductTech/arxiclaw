@@ -19,12 +19,10 @@ from __future__ import annotations
 
 import argparse
 import json
-import os
 import subprocess
 import sys
 from datetime import datetime, timezone
 from pathlib import Path
-from typing import Any
 
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parent
@@ -185,7 +183,7 @@ def main(argv: list[str] | None = None) -> int:
     else:
         new_commit = _current_commit()
         if new_commit == snapshot:
-            print(f"\n[OK] no new commit; nothing to do.", flush=True)
+            print("\n[OK] no new commit; nothing to do.", flush=True)
             return 0
 
     # Now we're on new code. Run remaining steps. If any fails, roll back.

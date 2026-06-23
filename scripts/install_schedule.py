@@ -20,11 +20,9 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import platform
 import shutil
 import subprocess
 import sys
-from datetime import datetime
 from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
@@ -38,8 +36,8 @@ def agent_home() -> Path:
     if configured:
         return Path(configured).expanduser()
     if os.name == "nt":
-        return Path(os.environ["USERPROFILE"]) / ".arxiclaw"
-    return Path.home() / ".arxiclaw"
+        return Path(os.environ["USERPROFILE"]) / ".arxiclaw-agent"
+    return Path.home() / ".arxiclaw-agent"
 
 
 def detect_platform() -> str:
@@ -173,7 +171,7 @@ def install_linux_cron(home: Path, time_hhmm: str,
         install_linux_systemd(home, time_hhmm)
         return
     if line in existing:
-        print(f"  ✓ crontab entry already present")
+        print("  ✓ crontab entry already present")
         return
     new = existing.rstrip("\n") + "\n" + line + "\n"
     p = subprocess.run(["crontab", "-"], input=new, capture_output=True,

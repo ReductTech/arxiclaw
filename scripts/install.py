@@ -20,7 +20,6 @@ import os
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any
 
 # ---------- paths ----------
 
@@ -35,9 +34,9 @@ ARXICLAW_AGENT_HOME = os.environ.get("ARXICLAW_AGENT_HOME")
 if ARXICLAW_AGENT_HOME:
     HOME = Path(ARXICLAW_AGENT_HOME).expanduser()
 elif os.name == "nt":
-    HOME = Path(os.environ.get("USERPROFILE", "~")) / ".arxiclaw"
+    HOME = Path(os.environ.get("USERPROFILE", "~")) / ".arxiclaw-agent"
 else:
-    HOME = Path.home() / ".arxiclaw"
+    HOME = Path.home() / ".arxiclaw-agent"
 
 
 # ---------- helpers ----------
@@ -91,6 +90,8 @@ def step_bootstrap(non_interactive: bool) -> bool:
         # rc=2 is bootstrap's "missing required arg" exit code;
         # in non-interactive mode this is expected (we ran out of input)
         print(f"  [WARN] bootstrap exited with code {rc}", file=sys.stderr)
+        print("         Run `python scripts/doctor.py --json` to inspect dependencies, "
+              "credentials, and state files.", file=sys.stderr)
         return False
     print("  [OK] bootstrap complete", flush=True)
     return True

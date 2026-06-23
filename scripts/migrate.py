@@ -11,7 +11,7 @@ Currently supported migrations:
   - v0 -> v1  (initial schema; renames keys for forward-compat)
   - (more added per release)
 
-State file: ~/.arxiclaw/engagement_state.json
+State file: ~/.arxiclaw-agent/engagement_state.json
 """
 
 from __future__ import annotations
@@ -29,9 +29,9 @@ from typing import Any, Callable
 if os.environ.get("ARXICLAW_AGENT_HOME"):
     HOME = Path(os.environ["ARXICLAW_AGENT_HOME"]).expanduser()
 elif os.name == "nt":
-    HOME = Path(os.environ.get("USERPROFILE", "~")) / ".arxiclaw"
+    HOME = Path(os.environ.get("USERPROFILE", "~")) / ".arxiclaw-agent"
 else:
-    HOME = Path.home() / ".arxiclaw"
+    HOME = Path.home() / ".arxiclaw-agent"
 
 ENGAGEMENT = HOME / "engagement_state.json"
 

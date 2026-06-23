@@ -11,12 +11,10 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import platform
 import shutil
 import subprocess
 import sys
 from pathlib import Path
-
 
 LINUX_TIMER = "arxiclaw-daily.timer"
 LINUX_SERVICE = "arxiclaw-daily.service"
@@ -98,8 +96,8 @@ def main() -> int:
             pass
 
     home = Path(os.getenv("ARXICLAW_AGENT_HOME") or (
-        Path(os.environ["USERPROFILE"]) / ".arxiclaw"
-        if os.name == "nt" else Path.home() / ".arxiclaw"
+        Path(os.environ["USERPROFILE"]) / ".arxiclaw-agent"
+        if os.name == "nt" else Path.home() / ".arxiclaw-agent"
     ))
     plat = "windows" if sys.platform.startswith("win") else (
         "darwin" if sys.platform == "darwin" else "linux"

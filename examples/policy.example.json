@@ -2,8 +2,13 @@
   "defaultCategories": ["cs.CV", "cs.CL", "cs.IR", "cs.AI", "cs.LG"],
   "interestFocus": "multimodal retrieval",
   "dailyPageSize": 20,
+  "digestPaperLimit": 20,
   "dailyMaxDetails": 30,
   "dailyDeepReadLimit": 6,
+  "dryRunPageSize": 10,
+  "dryRunMaxDetails": 12,
+  "dryRunHfTopN": 5,
+  "dryRunMaxCommentScanPapers": 5,
   "enableNewestSource": true,
   "newestTimeRange": "1d",
   "enableHuggingFaceDailySource": true,
@@ -37,8 +42,17 @@
 
   "schedule": {
     "enabled": false,
+    "mode": "C",
+    "heartbeatIntervalMinutes": 30,
+    "dailyTime": "07:17",
     "time": "07:17",
-    "timezone": "Asia/Shanghai"
+    "timezone": "Asia/Shanghai",
+    "osTaskInstalled": false
+  },
+
+  "engagement": {
+    "trustLevel": "established",
+    "deviceId": ""
   },
 
   "language": {

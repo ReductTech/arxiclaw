@@ -21,9 +21,6 @@ network calls and only return local-state portions.
 from __future__ import annotations
 
 import json
-import re
-import sys
-import time
 from datetime import datetime, timedelta, timezone
 from pathlib import Path
 from typing import Any
@@ -84,7 +81,6 @@ def flatten_comments(comments: Any) -> list[dict[str, Any]]:
             continue
         cc = dict(c)
         out.append(cc)
-        cid = cc.get("id") or cc.get("commentId") or cc.get("comment_id") or cc.get("uuid")
         for child_key in ("replies", "children"):
             if isinstance(cc.get(child_key), list):
                 out.extend(flatten_comments(cc[child_key]))

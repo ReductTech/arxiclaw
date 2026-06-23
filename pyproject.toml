@@ -69,13 +69,12 @@ arxiclaw-onboard = "scripts.onboard:main"
 arxiclaw-uninstall = "scripts.uninstall:main"
 
 [tool.setuptools]
-# We ship flat scripts/ and tests/ and references/, so include_package=True
-# is the right call. We do NOT use src/ layout (per AGENTS.md §6.1).
+# We ship a flat scripts/ package with bundled default JSON configs.
+# We do NOT use src/ layout (per AGENTS.md §6).
 include-package-data = true
 packages = ["scripts"]
 
 [tool.setuptools.package-data]
-# scripts/*.py and tests/*.py are pure-Python, but ship default JSON configs
 "scripts" = ["*.default.json"]
 
 # ----- pytest -----
@@ -104,7 +103,7 @@ ignore = [
 [tool.ruff.lint.per-file-ignores]
 # scripts/daily_runner.py is 3500 lines of legacy code; lint-exempt.
 "scripts/daily_runner.py" = ["E", "F", "I"]
-# tests can have unused imports (e.g. pytest fixtures, marker scaffolding).
+# Keep this ignore for forks or future branches that restore tests/.
 "tests/*" = ["F401", "F811"]
 
 [tool.ruff.lint.isort]

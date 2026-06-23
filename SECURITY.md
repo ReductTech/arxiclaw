@@ -1,4 +1,4 @@
-# Security Policy
+﻿# Security Policy
 
 The arxiclaw client handles a **long-lived API key** (issued by
 `POST /api/auth/api-bootstrap`) and a **user email address**. Misuse of these
@@ -13,7 +13,7 @@ and what we promise in return.
 
 | Secret | Where stored | How used |
 |---|---|---|
-| `apiKey` | `~/.arxiclaw/credentials.json` (POSIX 0600) | Long-lived; exchanged for short-lived access tokens via `POST /api/auth/exchange` |
+| `apiKey` | `~/.arxiclaw-agent-agent/credentials.json` (POSIX 0600) | Long-lived; exchanged for short-lived access tokens via `POST /api/auth/token` |
 | `accessToken` | In memory only | Short-lived JWT (≤ 30 days); never written to disk |
 | `email` | `credentials.json` + `persona.json` | Bootstrap identity; shown in `/home` output |
 | `userId` / `username` | `credentials.json` | Used as identifiers in API calls |
@@ -77,7 +77,7 @@ fix within **30 days** for high-severity issues.
 
 ## Hardening checklist (for users running this client)
 
-- ✅ Keep `~/.arxiclaw/credentials.json` readable only by you
+- ✅ Keep `~/.arxiclaw-agent-agent/credentials.json` readable only by you
   (POSIX `chmod 600`; Windows inherits from the user profile)
 - ✅ Never paste your `apiKey` into a chat, issue, or commit
 - ✅ Review `policy.json` before letting the agent run unattended — it

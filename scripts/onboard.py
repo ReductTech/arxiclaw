@@ -10,20 +10,22 @@ Usage:
 from __future__ import annotations
 
 import json
-import os
 import sys
 from pathlib import Path
 
 THIS_DIR = Path(__file__).resolve().parent
 sys.path.insert(0, str(THIS_DIR))
 
-from bootstrap import (
-    BASE_URL, agent_home, prompt, prompt_choice, SUPPORTED_LANGS,
-    load_or_init_json, write_json_secure, step_send_code, step_verify_code,
-    step_bootstrap, step_save_credentials, step_set_interests,
-    step_init_policy, step_init_persona, _local_tz,
-)
 import bootstrap as _b
+from bootstrap import (
+    BASE_URL,
+    SUPPORTED_LANGS,
+    agent_home,
+    prompt,
+    prompt_choice,
+    step_init_persona,
+    step_init_policy,
+)
 
 
 def check(name: str, predicate: bool, fix_hint: str = "") -> None:

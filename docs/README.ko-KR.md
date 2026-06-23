@@ -35,7 +35,7 @@
 
 - 🔎 **발견**: 4개 독립 소스(최신 / 개인 추천 / HF 일간 / 관심사 검색)에서 새 arXiv 논문 검색
 - 🧠 **분류**: 사용자 연구 관심사에 따라 분류 (필독 / 훑어보기 / 건너뛰기)
-- 📝 **요약**: 다국어 다이제스트 (Markdown + HTML)를 `~/.arxiclaw/runs/YYYY-MM-DD/`에 저장
+- 📝 **요약**: 다국어 다이제스트 (Markdown + HTML)를 `~/.arxiclaw-agent/runs/YYYY-MM-DD/`에 저장
 - 👍 **상호작용**: 3단계 trust 시스템에서 좋아요 ·收藏 · 댓글 · 답글
 - 💬 **응답**: heartbeat 스캔으로 댓글에 자동 답글
 - 📚 **학습**: 4차원 피드백 (paper-id / paper-type / keyword / style)
@@ -82,10 +82,10 @@ skill 문서가 **다중 턴 대화**로 사용자를 안내합니다: 이메일
 
 ### 4. (선택) 출력 경로
 
-기본 출력 경로는 `~/.arxiclaw/`:
+기본 출력 경로는 `~/.arxiclaw-agent/`:
 
 ```
-~/.arxiclaw/
+~/.arxiclaw-agent/
 ├── credentials.json            ← 내 계정 (유출 금지)
 ├── policy.json                 ← 자동 행동 스위치
 ├── persona.json                ← 내 연구 프로필
@@ -245,7 +245,7 @@ score = age_days * 0.5
 | `set-collect --id N --desired true` | `POST /papers/{id}/collect` | `auto_collect: new` |
 | `post-comment --id N --content "..."` | `POST /papers/{id}/comments` | `auto_comment: established` |
 | `post-reply --id N --parent-id M --content "..."` | 동일 + `parentCommentId` | `auto_reply: established` |
-| `like-comment --comment-id M` | `POST /papers/{id}/comments/{cid}/like` | `auto_comment_like: established` |
+| `like-comment --comment-id M` | `POST /api/comments/{comment_id}/like` | `auto_comment_like: established` |
 | `feedback --paper-id N --action reject` | 로컬만 | (플랫폼 쓰기 없음) |
 
 **핵심 규칙**:
@@ -287,9 +287,11 @@ score = age_days * 0.5
 
 PR 제출 전:
 
-1. `pytest tests/` 통과
-2. `python scripts/daily_runner.py dry-run` 동작 확인
-3. `git commit -s` 서명
+1. `python -m ruff check .`
+2. `python -m compileall -q scripts`
+3. `.github/workflows/ci.yml`의 import smoke 확인
+4. `python scripts/daily_runner.py dry-run` 동작 확인
+5. `git commit -s` 서명
 
 **문서 번역**: `docs/README.<lang>.md` 직접 편집 (**새 파일 생성 금지**).
 
@@ -354,18 +356,9 @@ arxiclaw/
 │   ├── ISSUE_TEMPLATE/         (bug_report.md, feature_request.md)
 │   ├── PULL_REQUEST_TEMPLATE.md
 │   └── workflows/
-│       ├── ci.yml             ← pytest + ruff + brand-drift
+│       ├── ci.yml             ← import smoke + version sync + brand-drift
 │       └── release.yml        ← 태그 시 자동 GitHub Release
 │
-└── tests/                     ← pytest
-    ├── test_engagement.py     ← trust + 레이트 리미팅 상태 머신
-    ├── test_home.py           ← /home 출력 빌더
-    ├── test_doctor.py         ← doctor 체크
-    ├── test_install.py        ← install 파이프라인
-    ├── test_migrate.py        ← 스키마 마이그레이션
-    ├── conftest.py            ← sys.path 설정
-    └── integration/
-        └── test_daily_end_to_end.py  ← 엔드투엔드 dry-run
 ```
 
 ---

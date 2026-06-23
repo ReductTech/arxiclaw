@@ -1,7 +1,7 @@
-"""arxiclaw daily research runner with i18n support (v2 — restructured).
+"""arxiclaw daily research runner with i18n support.
 
 Reads credentials, policy, persona from ARXICLAW_AGENT_HOME (default
-~/.arxiclaw). Discovers papers from newest + recommendations +
+~/.arxiclaw-agent). Discovers papers from newest + recommendations +
 HF daily + per-interest search, dedupes, fetches details, sorts into
 must_read / skim / skip (interest-related), generates a multi-language
 daily digest, and (when policy allows) executes like / collect /
@@ -9,7 +9,7 @@ comment / reply / comment-like actions with toggle-aware idempotency.
 
 Strict contract:
 - must_read / skim / skip are interest-related (core_hits >= 1
-  ∪ token_hits >= 1 ∪ explicit persona signal). Unrelated candidates
+  or token_hits >= 1 or explicit persona signal). Unrelated candidates
   stay in evidence_pack.json as unrelated_filtered.
 - HF daily top 10 is its own section, not merged into the candidate
   pool.
@@ -55,6 +55,19 @@ SUPPORTED_LANGS = ("zh-CN", "en-US")
 DEFAULT_LANG = "zh-CN"
 DEFAULT_MAX_REPLIES_PER_RUN = 3
 DEFAULT_MAX_COMMENT_LIKES_PER_RUN = 10
+DEFAULT_DRY_RUN_PAGE_SIZE = 10
+DEFAULT_DRY_RUN_MAX_DETAILS = 12
+DEFAULT_DRY_RUN_HF_TOP_N = 5
+DEFAULT_DRY_RUN_COMMENT_SCAN_PAPERS = 5
+SUPPORTED_ACTION_TYPES = {
+    "like",
+    "collect",
+    "comment",
+    "reply",
+    "comment_like",
+    "feedback_reject",
+    "feedback_accept",
+}
 
 
 # ---------- Core category terms (used for triage) ----------
@@ -75,36 +88,53 @@ FOCUS_STOP = {"the", "and", "for", "with", "from", "augmented",
 
 I18N_ZH: dict[str, str] = {
     # console / fatal
-    "fatal_credentials_missing": "[致命] 缺少 credentials.json,无法继续",
-    "fatal_api_bootstrap": "[致命] api-bootstrap 失败:{err}",
-    "ok_daily_run_finished": "[成功] 每日运行完成,必读={mr} 速览={sk} 跳过={sp} 动作={ac}",
+    "fatal_credentials_missing": "[致命] 缺少 credentials.json，无法继续",
+    "fatal_api_bootstrap": "[致命] api-bootstrap 失败：{err}",
+    "ok_daily_run_finished": "[成功] 每日运行完成，必读={mr} 速览={sk} 跳过={sp} 动作={ac}",
     "stage": "阶段",
-    "auth": "认证", "discovery": "发现", "triage": "分流", "actions": "动作",
+    "auth": "认证",
+    "discovery": "发现",
+    "triage": "分流",
+    "actions": "动作",
     # digest
     "digest_title": "arxiclaw 每日论文摘要 {date}",
-    "user_label": "用户", "summary_label": "摘要", "evidence_label": "证据范围",
-    "must_read_label": "必读", "skim_label": "速览", "skip_label": "跳过",
+    "user_label": "用户",
+    "summary_label": "摘要",
+    "evidence_label": "证据范围",
+    "must_read_label": "必读",
+    "skim_label": "速览",
+    "skip_label": "跳过",
     "skip_count_label": "跳过数",
     "section_must_read": "必读",
     "section_hf_daily_top10": "Hugging Face 日榜 Top 10",
     "section_skim": "速览",
     "section_skip": "跳过",
     "section_actions": "今日智能体动作",
-    "label_authors": "作者", "label_arxiv": "arXiv", "label_published": "发布日期",
-    "label_category": "类别", "label_code": "代码",
-    "label_fig_alt": "论文主图", "label_tab_alt": "论文主表",
-    "label_fig_missing": "📄 无封面图",
-    "label_keywords": "关键词", "label_source": "来源", "label_type": "类型",
+    "label_authors": "作者",
+    "label_arxiv": "arXiv",
+    "label_published": "发布日期",
+    "label_category": "类别",
+    "label_code": "代码",
+    "label_fig_alt": "论文主图",
+    "label_tab_alt": "论文主表",
+    "label_fig_missing": "无封面图",
+    "label_keywords": "关键词",
+    "label_source": "来源",
+    "label_type": "类型",
     "label_no_summary": "(无摘要)",
     "label_overview": "今日总览",
     "label_discovery_sources": "发现源",
-    "label_footer": "本报告由 arxiclaw 智能体基于元数据自动生成;图片与摘要均来自平台 API 返回,未读 PDF 全文。",
-    "summary_template": "今日发现 {c} 篇候选;{mr} 篇必读;{sk} 篇速览;{sp} 篇跳过;执行 {ac} 个动作。",
-    "skipped_same": "(已是目标状态,跳过)",
-    "core_field": "命中核心类别", "tokens_field": "命中焦点词", "score_field": "评分",
+    "label_footer": "本报告由 arxiclaw 智能体基于平台元数据自动生成；图片与摘要均来自平台 API 返回，未读 PDF 全文。",
+    "summary_template": "今日发现 {c} 篇候选；{mr} 篇必读，{sk} 篇速览，{sp} 篇跳过；执行 {ac} 个动作。",
+    "skipped_same": "(已是目标状态，跳过)",
+    "core_field": "命中核心类别",
+    "tokens_field": "命中焦点词",
+    "score_field": "评分",
     "no_actions": "_(本次运行未执行任何动作)_",
     "none_label": "_(无)_",
-    "action_like": "点赞", "action_collect": "收藏", "action_comment": "评论",
+    "action_like": "点赞",
+    "action_collect": "收藏",
+    "action_comment": "评论",
     "label_no_papers": "(本段无内容)",
 }
 
@@ -126,7 +156,7 @@ I18N_EN: dict[str, str] = {
     "label_authors": "Authors", "label_arxiv": "arXiv", "label_published": "Published",
     "label_category": "Category", "label_code": "Code",
     "label_fig_alt": "key figure", "label_tab_alt": "key table",
-    "label_fig_missing": "📄 no cover figure",
+    "label_fig_missing": "no cover figure",
     "label_keywords": "Keywords", "label_source": "source", "label_type": "type",
     "label_no_summary": "(no summary available)",
     "label_overview": "Today's overview",
@@ -169,19 +199,36 @@ def agent_home() -> Path:
     if configured:
         return Path(configured).expanduser()
     if os.name == "nt":
-        return Path(os.environ["USERPROFILE"]) / ".arxiclaw"
-    return Path.home() / ".arxiclaw"
+        return Path(os.environ["USERPROFILE"]) / ".arxiclaw-agent"
+    return Path.home() / ".arxiclaw-agent"
 
 
 def load_json(path: Path, default: Any) -> Any:
     if not path.exists():
         return default
-    return json.loads(path.read_text(encoding="utf-8"))
+    return json.loads(path.read_text(encoding="utf-8-sig"))
 
 
 def save_json(path: Path, obj: Any) -> None:
     path.parent.mkdir(parents=True, exist_ok=True)
     path.write_text(json.dumps(obj, ensure_ascii=False, indent=2), encoding="utf-8")
+
+
+def load_policy(home: Path) -> dict[str, Any]:
+    default_path = Path(__file__).with_name("policy.default.json")
+    defaults = load_json(default_path, {}) if default_path.exists() else {}
+    policy = load_json(home / "policy.json", {})
+    if not isinstance(defaults, dict):
+        defaults = {}
+    if not isinstance(policy, dict):
+        policy = {}
+    merged = dict(defaults)
+    for key, value in policy.items():
+        if isinstance(value, dict) and isinstance(merged.get(key), dict):
+            merged[key] = {**merged[key], **value}
+        else:
+            merged[key] = value
+    return merged
 
 
 # ---------- HTTP helpers ----------
@@ -385,11 +432,14 @@ def get_recommendations(token: str, page_size: int) -> list[dict[str, Any]]:
 
 
 def get_huggingface_papers(period: str, page_size: int) -> list[dict[str, Any]]:
-    """`GET /api/huggingface/daily-papers` — response is `items[].paper`."""
+    """`GET /api/huggingface/daily-papers`; response is `items[].paper`."""
     try:
         payload = unwrap(requests.get(
             f"{BASE_URL}/api/huggingface/daily-papers",
-            params={"page": 1, "pageSize": page_size, "period": period},
+            params={
+                "page": 1, "pageSize": page_size, "period": period,
+                "cacheOnly": "true", "fallbackLatest": "true",
+            },
             timeout=TIMEOUT,
         ))
     except (requests.HTTPError, requests.ConnectionError, requests.Timeout,
@@ -946,9 +996,10 @@ def _draft_reply(paper: dict[str, Any], comment: dict[str, Any], lang: str) -> s
     used in production. Kept for backwards compatibility / testing."""
     title = str(paper.get("title") or "")[:180]
     if lang == "zh-CN":
-        return (f"我也在看《{title}》。你这个点很有价值;从平台摘要看,"
+        return (f"我也在看《{title}》。你这个点很有价值；从平台摘要看，"
                 f"我会进一步关注它是否把核心假设、评测设置和失败案例讲清楚。"
-                f"如果后续有更多实验细节,尤其是和检索/多模态证据相关的消融,我也想继续跟进。")
+                f"如果后续有更多实验细节，尤其是和检索或多模态证据相关的消融，"
+                f"我也想继续跟进。")
     return (f"I am also reading \"{title}\". Your point is useful; from the "
             f"platform metadata, I would next check whether the paper clearly "
             f"separates its core assumption, evaluation setup, and failure "
@@ -965,17 +1016,26 @@ def process_comment_interactions(token: str, user_id: int, username: str,
     allow_comment_like = bool(policy.get("allowAutoCommentLike", True))
     max_replies = int(policy.get("maxRepliesPerDailyRun", DEFAULT_MAX_REPLIES_PER_RUN) or 0)
     max_likes = int(policy.get("maxCommentLikesPerDailyRun", DEFAULT_MAX_COMMENT_LIKES_PER_RUN) or 0)
+    max_scan_papers = int(policy.get("maxCommentScanPapersPerRun", 15) or 15)
+    if dry_run:
+        max_scan_papers = min(
+            max_scan_papers,
+            int(policy.get("dryRunMaxCommentScanPapers", DEFAULT_DRY_RUN_COMMENT_SCAN_PAPERS)
+                or DEFAULT_DRY_RUN_COMMENT_SCAN_PAPERS),
+        )
     reply_scope = policy.get("replyScope") or "same_paper_discussion"
     proposals: list[dict[str, Any]] = []
     results: list[dict[str, Any]] = []
     scanned = 0
-    replied = 0
-    liked = 0
+    reply_proposed = 0
+    like_proposed = 0
     seen_papers: set[int] = set()
     replied_ids = set(str(x) for x in state.get("replied_comment_ids", []))
     liked_ids = set(str(x) for x in state.get("liked_comment_ids", []))
     processed_ids = set(str(x) for x in state.get("processed_comment_ids", []))
     for paper in papers:
+        if len(seen_papers) >= max_scan_papers:
+            break
         paper_id = paper.get("paperId") or paper.get("id")
         if paper_id is None:
             continue
@@ -998,74 +1058,496 @@ def process_comment_interactions(token: str, user_id: int, username: str,
             content = _comment_content(c)
             if not content:
                 continue
-            if (allow_comment_like and liked < max_likes
+            evidence_refs = [
+                f"paper:{pid}:summary",
+                f"paper:{pid}:comment:{cid}",
+            ]
+            if (allow_comment_like and like_proposed < max_likes
                     and not is_self and cid not in liked_ids):
                 liked_field = _comment_liked(c)
                 if liked_field is not True:
-                    action_id = f"commentlike_{today_stamp()}_{liked + 1:03d}"
+                    action_id = f"commentlike_{today_stamp()}_{like_proposed + 1:03d}"
                     proposals.append({
                         "actionId": action_id, "actionType": "comment_like",
                         "paperId": pid, "commentId": cid,
                         "title": paper.get("title"),
-                        "reason": "same-paper discussion comment",
+                        "reason": "same-paper discussion comment is eligible for acknowledgement",
+                        "evidenceRefs": evidence_refs,
                         "riskLevel": "external_write",
                         "requiresApproval": False, "status": "proposed",
                     })
-                    res = ({"ok": True, "dryRun": True} if dry_run
-                           else _do_comment_like(token, cid, user_id, username))
-                    results.append({
-                        "actionId": action_id, "actionType": "comment_like",
-                        "paperId": pid, "commentId": cid,
-                        "platform": res, "executedAt": utc_now_iso(),
-                    })
-                    if res.get("ok") and not dry_run:
-                        liked_ids.add(cid)
-                        post_user_behavior(token, user_id, username, "comment_like",
-                                            paper_id=pid, result_state="active",
-                                            source="heartbeat")
-                    liked += 1
-            if (allow_reply and replied < max_replies and not is_self
+                    like_proposed += 1
+            if (allow_reply and reply_proposed < max_replies and not is_self
                     and cid not in replied_ids and cid not in processed_ids
                     and reply_scope == "same_paper_discussion"):
-                reply = _draft_reply(paper, c, comment_lang)
-                action_id = f"reply_{today_stamp()}_{replied + 1:03d}"
+                action_id = f"reply_{today_stamp()}_{reply_proposed + 1:03d}"
                 proposals.append({
                     "actionId": action_id, "actionType": "reply",
                     "paperId": pid, "commentId": cid,
-                    "title": paper.get("title"), "content": reply,
+                    "parentCommentId": cid,
+                    "title": paper.get("title"),
+                    "contentSlot": "external_agent_required",
                     "contentLanguage": comment_lang,
+                    "reason": "external agent may reply if it can add evidence-backed research context",
+                    "evidenceRefs": evidence_refs,
+                    "needsUserInput": False,
                     "riskLevel": "external_write", "requiresApproval": False,
                     "status": "proposed",
                 })
-                res = ({"ok": True, "dryRun": True} if dry_run
-                       else _do_reply(token, pid, cid, reply))
-                results.append({
-                    "actionId": action_id, "actionType": "reply",
-                    "paperId": pid, "commentId": cid,
-                    "content_preview": reply[:200] + ("..." if len(reply) > 200 else ""),
-                    "content_full": reply,
-                    "platform": res, "executedAt": utc_now_iso(),
-                })
-                if res.get("ok") and not dry_run:
-                    replied_ids.add(cid)
-                    processed_ids.add(cid)
-                    post_user_behavior(token, user_id, username, "paper_comment_reply",
-                                        paper_id=pid, result_state="active",
-                                        source="heartbeat")
-                replied += 1
-    if not dry_run:
-        state["replied_comment_ids"] = list(replied_ids)
-        state["liked_comment_ids"] = list(liked_ids)
-        state["processed_comment_ids"] = list(processed_ids)
+                reply_proposed += 1
     summary = {
         "scannedComments": scanned,
+        "scannedPapers": len(seen_papers),
+        "scanLimitPapers": max_scan_papers,
+        "scanLimited": len(seen_papers) >= max_scan_papers,
         "replyProposals": sum(1 for p in proposals if p.get("actionType") == "reply"),
         "commentLikeProposals": sum(1 for p in proposals if p.get("actionType") == "comment_like"),
-        "replyResults": sum(1 for r in results if r.get("actionType") == "reply"),
-        "commentLikeResults": sum(1 for r in results if r.get("actionType") == "comment_like"),
+        "replyResults": 0,
+        "commentLikeResults": 0,
         "dryRun": dry_run,
+        "mode": "proposal_only",
     }
     return proposals, results, summary
+
+
+def _paper_identity(paper: dict[str, Any]) -> int | str | None:
+    return paper.get("paperId") or paper.get("id")
+
+
+def _merge_unique_by_key(existing: list[dict[str, Any]],
+                         incoming: list[dict[str, Any]],
+                         key: str) -> list[dict[str, Any]]:
+    merged: dict[str, dict[str, Any]] = {}
+    order: list[str] = []
+    for item in [*existing, *incoming]:
+        if not isinstance(item, dict):
+            continue
+        value = item.get(key)
+        if value is None and key == "paperId":
+            value = item.get("id")
+        if value is None:
+            value = f"idx:{len(order)}"
+        skey = str(value)
+        if skey not in merged:
+            order.append(skey)
+            merged[skey] = dict(item)
+        else:
+            merged[skey].update({k: v for k, v in item.items() if v not in (None, "", [])})
+    return [merged[k] for k in order]
+
+
+def _cap_recommendations(must_read: list[dict[str, Any]],
+                         skim: list[dict[str, Any]],
+                         limit: int) -> tuple[list[dict[str, Any]], list[dict[str, Any]], list[dict[str, Any]]]:
+    if limit <= 0:
+        limit = 20
+    ordered = [("must_read", p) for p in must_read] + [("skim", p) for p in skim]
+    kept = ordered[:limit]
+    removed = ordered[limit:]
+    capped_must = [p for bucket, p in kept if bucket == "must_read"]
+    capped_skim = [p for bucket, p in kept if bucket == "skim"]
+    changes = []
+    for bucket, paper in removed:
+        changes.append({
+            "paperId": _paper_identity(paper),
+            "title": paper.get("title"),
+            "fromBucket": bucket,
+            "toBucket": "overflow",
+            "reason": "digestPaperLimit",
+            "changedAt": utc_now_iso(),
+        })
+    return capped_must, capped_skim, changes
+
+
+def _proposal_evidence_refs(paper: dict[str, Any]) -> list[str]:
+    pid = _paper_identity(paper)
+    refs = [f"paper:{pid}:summary", f"paper:{pid}:recommendation"]
+    if paper.get("key_fig_url"):
+        refs.append(f"paper:{pid}:key_fig")
+    if paper.get("key_tab_url"):
+        refs.append(f"paper:{pid}:key_tab")
+    return refs
+
+
+def _build_action_proposals_for_papers(
+    ranked_papers: list[dict[str, Any]],
+    comment_lang: str,
+    policy: dict[str, Any],
+) -> list[dict[str, Any]]:
+    proposals: list[dict[str, Any]] = []
+    seq = 1
+    action_policy = {
+        "like": bool(policy.get("allowAutoLike", True)),
+        "collect": bool(policy.get("allowAutoCollect", True)),
+        "comment": bool(policy.get("allowAutoComment", True)),
+    }
+    for paper in ranked_papers:
+        pid = _paper_identity(paper)
+        if pid is None:
+            continue
+        bucket = paper.get("bucket") or (
+            "must_read" if paper in ranked_papers else "skim"
+        )
+        for action_type in ("like", "collect", "comment"):
+            if action_type == "comment" and bucket != "must_read":
+                continue
+            proposal = {
+                "actionId": f"{action_type}_{today_stamp()}_{seq:03d}",
+                "actionType": action_type,
+                "paperId": pid,
+                "title": paper.get("title", ""),
+                "reason": (
+                    f"{bucket}: score={paper.get('score', 0)}; "
+                    "external agent must provide content for comments"
+                ),
+                "evidenceRefs": _proposal_evidence_refs(paper),
+                "dryRun": False,
+                "status": "proposed" if action_policy[action_type] else "skipped",
+                "skipReason": "" if action_policy[action_type] else "policy_disabled",
+            }
+            if action_type == "comment":
+                proposal["contentSlot"] = "external_agent_required"
+                proposal["contentLanguage"] = comment_lang
+            proposals.append(proposal)
+            seq += 1
+    return proposals
+
+
+def _load_today_digest(run_dir: Path) -> dict[str, Any]:
+    digest = load_json(run_dir / "daily_digest.json", {})
+    return digest if isinstance(digest, dict) else {}
+
+
+def _merge_digest(existing: dict[str, Any], incoming: dict[str, Any],
+                  policy: dict[str, Any]) -> dict[str, Any]:
+    if not existing:
+        existing = {}
+    out = dict(existing)
+    for key, value in incoming.items():
+        if key not in {
+            "mustRead",
+            "skim",
+            "skip",
+            "actionResults",
+            "actionProposals",
+            "replyProposals",
+            "replyResults",
+            "selectionChanges",
+            "discussionStatus",
+            "sourceStatus",
+        }:
+            out[key] = value
+    must = _merge_unique_by_key(existing.get("mustRead") or [],
+                                incoming.get("mustRead") or [], "paperId")
+    skim = _merge_unique_by_key(existing.get("skim") or [],
+                                incoming.get("skim") or [], "paperId")
+    limit = int(policy.get("digestPaperLimit", 20) or 20)
+    must, skim, limit_changes = _cap_recommendations(must, skim, limit)
+    out["mustRead"] = must
+    out["skim"] = skim
+    out["selectedPapers"] = [
+        {"paperId": p.get("paperId"), "title": p.get("title"), "bucket": "must_read"}
+        for p in must
+    ] + [
+        {"paperId": p.get("paperId"), "title": p.get("title"), "bucket": "skim"}
+        for p in skim
+    ]
+    out["selectionChanges"] = [
+        *(existing.get("selectionChanges") or []),
+        *(incoming.get("selectionChanges") or []),
+        *limit_changes,
+    ][-500:]
+    out["skip"] = _merge_unique_by_key(existing.get("skip") or [],
+                                       incoming.get("skip") or [], "paperId")
+    out["skip_total"] = len(out["skip"])
+    out["skip_displayed"] = min(
+        len(out["skip"]), int(policy.get("skipDisplayLimit", 10) or 10)
+    )
+    out["actionResults"] = [
+        *(existing.get("actionResults") or []),
+        *(incoming.get("actionResults") or []),
+    ][-1000:]
+    out["actionProposals"] = incoming.get("actionProposals") or existing.get("actionProposals") or []
+    out["replyProposals"] = _merge_unique_by_key(
+        existing.get("replyProposals") or [],
+        incoming.get("replyProposals") or [],
+        "actionId",
+    )
+    out["replyResults"] = [
+        *(existing.get("replyResults") or []),
+        *(incoming.get("replyResults") or []),
+    ][-1000:]
+    out["discussionStatus"] = {
+        **(existing.get("discussionStatus") or {}),
+        **(incoming.get("discussionStatus") or {}),
+    }
+    out["sourceStatus"] = {
+        **(existing.get("sourceStatus") or {}),
+        **(incoming.get("sourceStatus") or {}),
+    }
+    out["updatedAt"] = utc_now_iso()
+    return out
+
+
+def _rerender_digest_files(run_dir: Path, digest: dict[str, Any],
+                           stored_lang: str, digest_lang: str,
+                           inline_images: bool) -> None:
+    save_json(run_dir / "daily_digest.json", digest)
+    (run_dir / f"daily_digest.{stored_lang}.md").write_text(
+        render_digest_md(digest, digest_lang), encoding="utf-8",
+    )
+    html_text = _render_digest_html(digest, stored_lang,
+                                    inline_images=inline_images)
+    (run_dir / f"daily_digest.{stored_lang}.html").write_text(
+        html_text, encoding="utf-8",
+    )
+
+
+def _extract_actions(payload: Any) -> list[dict[str, Any]]:
+    if isinstance(payload, list):
+        return [a for a in payload if isinstance(a, dict)]
+    if isinstance(payload, dict):
+        actions = payload.get("actions")
+        if isinstance(actions, list):
+            return [a for a in actions if isinstance(a, dict)]
+    return []
+
+
+def _content_quality_gate(action: dict[str, Any]) -> tuple[bool, str]:
+    atype = action.get("actionType")
+    if atype not in ("comment", "reply"):
+        return (True, "")
+    content = str(action.get("content") or "").strip()
+    if not content:
+        return (False, "missing_content")
+    if len(content) < 20 or len(content) > 300:
+        return (False, "bad_length")
+    lowered = content.lower()
+    placeholders = (
+        "todo", "tbd", "placeholder", "lorem ipsum", "<content>",
+        "待补充", "占位", "这里写", "关键词", "关键字",
+    )
+    if any(p in lowered for p in placeholders):
+        return (False, "placeholder_detected")
+    if "???" in content or "\ufffd" in content:
+        return (False, "garbled_text_detected")
+    words = re.findall(r"[\w\u4e00-\u9fff]+", content)
+    unique_words = set(words)
+    if len(words) >= 8 and len(unique_words) <= 3:
+        return (False, "keyword_string_detected")
+    refs = action.get("evidenceRefs")
+    if not isinstance(refs, list) or len([r for r in refs if r]) < 2:
+        return (False, "insufficient_evidence")
+    return (True, "")
+
+
+def _validate_action_schema(action: dict[str, Any]) -> tuple[bool, str]:
+    atype = action.get("actionType")
+    if atype not in SUPPORTED_ACTION_TYPES:
+        return (False, "unsupported_action")
+    if not action.get("reason"):
+        return (False, "missing_reason")
+    if atype in ("like", "collect", "comment", "reply",
+                 "feedback_reject", "feedback_accept"):
+        if action.get("paperId") is None:
+            return (False, "missing_paperId")
+    if atype == "comment_like" and action.get("commentId") is None:
+        return (False, "missing_commentId")
+    if atype == "reply" and not (
+        action.get("parentCommentId") or action.get("commentId")
+    ):
+        return (False, "missing_parentCommentId")
+    return _content_quality_gate(action)
+
+
+def _result_for_skip(action: dict[str, Any], reason: str) -> dict[str, Any]:
+    return {
+        "actionId": action.get("actionId"),
+        "actionType": action.get("actionType"),
+        "paperId": action.get("paperId"),
+        "commentId": action.get("commentId"),
+        "parentCommentId": action.get("parentCommentId"),
+        "title": action.get("title"),
+        "reason": action.get("reason", ""),
+        "evidenceRefs": action.get("evidenceRefs") or [],
+        "skipped": True,
+        "skipReason": reason,
+        "platform": {"ok": False, "skipped": True, "reason": reason},
+        "executedAt": utc_now_iso(),
+    }
+
+
+def _apply_feedback_action(home: Path, action: dict[str, Any],
+                           dry_run: bool) -> dict[str, Any]:
+    if dry_run:
+        return {"ok": True, "dryRun": True, "localOnly": True}
+    persona = load_json(home / "persona.json", {})
+    persona.setdefault("rejected_paper_ids", [])
+    persona.setdefault("feedback_history", [])
+    pid = action.get("paperId")
+    atype = action.get("actionType")
+    if atype == "feedback_reject":
+        if pid not in persona["rejected_paper_ids"]:
+            persona["rejected_paper_ids"].append(pid)
+        feedback_action = "reject"
+    else:
+        persona["rejected_paper_ids"] = [
+            x for x in persona.get("rejected_paper_ids", []) if x != pid
+        ]
+        persona.setdefault("accepted_paper_ids", [])
+        if pid not in persona["accepted_paper_ids"]:
+            persona["accepted_paper_ids"].append(pid)
+        feedback_action = "accept"
+    persona["feedback_history"].append({
+        "timestamp": utc_now_iso(),
+        "action": feedback_action,
+        "target": f"paper_id={pid}",
+        "reason": action.get("reason", ""),
+        "source": "execute-actions",
+    })
+    persona["feedback_history"] = persona["feedback_history"][-200:]
+    persona["updatedAt"] = utc_now_iso()
+    save_json(home / "persona.json", persona)
+    return {"ok": True, "localOnly": True}
+
+
+def _comment_like_already_active(paper_id: int | None, comment_id: str,
+                                 user_id: int) -> bool:
+    if paper_id is None:
+        return False
+    for comment in get_comments(paper_id, user_id):
+        if _comment_id(comment) == comment_id:
+            return _comment_liked(comment) is True
+    return False
+
+
+def _action_policy_and_rate(
+    action: dict[str, Any],
+    policy: dict[str, Any],
+    engagement_state: dict[str, Any],
+) -> tuple[bool, str, str | None]:
+    import engagement as _eng
+    atype = action.get("actionType")
+    mapping = {
+        "like": ("autoLike", "postLike"),
+        "collect": ("autoCollect", "postCollect"),
+        "comment": ("autoComment", "comment"),
+        "reply": ("autoReply", "reply"),
+        "comment_like": ("autoCommentLike", "commentLike"),
+    }
+    if atype not in mapping:
+        return (True, "", None)
+    capability, rate_action = mapping[atype]
+    ok, reason = _eng.can_perform(
+        policy,
+        capability,
+        engagement_state.get("trustLevel", "new"),
+        user_approved=bool(action.get("userApproved")),
+    )
+    if not ok:
+        return (False, f"policy_or_trust:{reason}", rate_action)
+    can, can_reason, _ = _eng.can_act(engagement_state, rate_action)
+    if not can:
+        return (False, f"rate_limited:{can_reason}", rate_action)
+    return (True, "", rate_action)
+
+
+def _execute_one_action(
+    home: Path,
+    action: dict[str, Any],
+    token: str,
+    user_id: int,
+    username: str,
+    policy: dict[str, Any],
+    engagement_state: dict[str, Any],
+    interaction_state: dict[str, Any],
+    dry_run: bool,
+) -> dict[str, Any]:
+    ok, reason = _validate_action_schema(action)
+    if not ok:
+        return _result_for_skip(action, reason)
+    action_dry_run = dry_run or bool(action.get("dryRun"))
+    ok, reason, rate_action = _action_policy_and_rate(action, policy, engagement_state)
+    if not ok:
+        return _result_for_skip(action, reason)
+    atype = action["actionType"]
+    pid = action.get("paperId")
+    result: dict[str, Any]
+    if action_dry_run:
+        result = {"ok": True, "dryRun": True}
+    elif atype == "like":
+        result = _set_state(token, int(pid), "like", user_id, username,
+                            desired=True, feedback_lang=DEFAULT_LANG)
+    elif atype == "collect":
+        result = _set_state(token, int(pid), "collect", user_id, username,
+                            desired=True, feedback_lang=DEFAULT_LANG)
+    elif atype == "comment":
+        result = _do_comment(token, int(pid), str(action["content"]).strip())
+    elif atype == "reply":
+        parent_id = str(action.get("parentCommentId") or action.get("commentId"))
+        result = _do_reply(token, int(pid), parent_id,
+                           str(action["content"]).strip())
+    elif atype == "comment_like":
+        comment_id = str(action["commentId"])
+        paper_id_int = int(pid) if pid is not None else None
+        if _comment_like_already_active(paper_id_int, comment_id, user_id):
+            result = {"ok": True, "skipped": True, "current": True}
+        else:
+            result = _do_comment_like(token, comment_id, user_id, username)
+    elif atype in ("feedback_reject", "feedback_accept"):
+        result = _apply_feedback_action(home, action, action_dry_run)
+    else:
+        result = {"ok": False, "error": "unsupported_action"}
+
+    if result.get("ok") and not action_dry_run:
+        import engagement as _eng
+        if rate_action:
+            _eng.record_action(
+                engagement_state,
+                rate_action,
+                paper_id=int(pid) if pid is not None else None,
+                comment_id=str(action.get("commentId")) if action.get("commentId") else None,
+                parent_id=str(action.get("parentCommentId")) if action.get("parentCommentId") else None,
+            )
+        if atype == "comment":
+            interaction_state.setdefault("commented_paper_ids", []).append(str(pid))
+            post_user_behavior(token, user_id, username, "paper_comment",
+                               paper_id=int(pid), result_state="active",
+                               source="execute-actions")
+        elif atype == "reply":
+            cid = str(action.get("parentCommentId") or action.get("commentId"))
+            interaction_state.setdefault("replied_comment_ids", []).append(cid)
+            interaction_state.setdefault("processed_comment_ids", []).append(cid)
+            post_user_behavior(token, user_id, username, "paper_comment_reply",
+                               paper_id=int(pid), result_state="active",
+                               source="execute-actions")
+        elif atype == "comment_like":
+            interaction_state.setdefault("liked_comment_ids", []).append(
+                str(action.get("commentId"))
+            )
+            if pid is not None:
+                post_user_behavior(token, user_id, username, "comment_like",
+                                   paper_id=int(pid), result_state="active",
+                                   source="execute-actions")
+
+    content = str(action.get("content") or "")
+    return {
+        "actionId": action.get("actionId"),
+        "actionType": atype,
+        "paperId": pid,
+        "commentId": action.get("commentId"),
+        "parentCommentId": action.get("parentCommentId"),
+        "title": action.get("title"),
+        "reason": action.get("reason", ""),
+        "evidenceRefs": action.get("evidenceRefs") or [],
+        "content_full": content,
+        "commentContent": content if atype == "comment" else "",
+        "replyContent": content if atype == "reply" else "",
+        "skipped": bool(result.get("skipped")),
+        "dryRun": action_dry_run,
+        "platform": result,
+        "executedAt": utc_now_iso(),
+    }
 
 
 # ---------- Time ----------
@@ -1104,7 +1586,7 @@ def _fmt_paper_meta_line(p: dict[str, Any], lang: str) -> list[str]:
         if len(s) > 180:
             s = s[:177].rstrip() + "..."
         if affils:
-            s += f"  _({', '.join(affils[:4])}{'…' if len(affils) > 4 else ''})_"
+            s += f"  _({', '.join(affils[:4])}{'...' if len(affils) > 4 else ''})_"
         out.append(f"- **{t(lang, 'label_authors')}:** {s}")
     ext = p.get("external_id") or ""
     pub = p.get("pub_url") or ""
@@ -1129,7 +1611,7 @@ def _fmt_paper_meta_line(p: dict[str, Any], lang: str) -> list[str]:
     if pub_date:
         misc_bits.append(f"{t(lang, 'label_published')}: {pub_date}")
     if cite:
-        misc_bits.append(f"引用: {cite}" if lang == "zh-CN" else f"citations: {cite}")
+        misc_bits.append(f"寮曠敤: {cite}" if lang == "zh-CN" else f"citations: {cite}")
     if stars:
         misc_bits.append(f"[github] {stars} stars")
     if misc_bits:
@@ -1237,10 +1719,17 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
     .paper-id{color:#a0aec0;font-size:12px;font-weight:normal;margin-left:8px}
     .empty{color:#a0aec0;font-style:italic}
     /* Collapsible sections: each <h2> is wrapped in <details open><summary> */
-    details.section{margin-top:24px;border:1px solid #cbd5e0;border-radius:8px;background:#fff;overflow:hidden}
+    details.digest-section{margin-top:24px;border:2px solid #a0aec0;border-radius:8px;background:#fff;overflow:hidden}
+    details.digest-section>summary{font-size:22px;font-weight:700;color:#1a365d;background:#e2e8f0;padding:14px 18px;cursor:pointer;list-style:none}
+    details.digest-section>summary::-webkit-details-marker{display:none}
+    details.digest-section>.digest-body{padding:4px 14px 18px}
+    .paper-recommendations{border-color:#90cdf4}
+    .behavior-summary{border-color:#f6ad55}
+    .gate-reason{display:inline-block;background:#fff5f5;color:#9b2c2c;border:1px solid #fed7d7;border-radius:10px;padding:1px 8px;font-size:12px;margin-left:6px}
+    details.section{margin-top:18px;border:1px solid #cbd5e0;border-radius:8px;background:#fff;overflow:hidden}
     details.section>summary{font-size:20px;font-weight:600;color:#2c5282;background:#edf2f7;padding:12px 16px;cursor:pointer;list-style:none;display:flex;align-items:center;user-select:none;border-bottom:1px solid #cbd5e0}
     details.section>summary::-webkit-details-marker{display:none}
-    details.section>summary::before{content:'▶';display:inline-block;margin-right:10px;font-size:13px;color:#718096;transition:transform 0.15s}
+    details.section>summary::before{content:'鈻?;display:inline-block;margin-right:10px;font-size:13px;color:#718096;transition:transform 0.15s}
     details.section[open]>summary::before{transform:rotate(90deg)}
     details.section>summary:hover{background:#e2e8f0}
     details.section>summary .sec-count{font-size:14px;font-weight:normal;color:#4a5568;margin-left:10px}
@@ -1254,13 +1743,14 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
     .toolbar .hint{margin-left:auto;color:#718096}
     """
     out: list[str] = [
-        f"<!DOCTYPE html><html lang='{lang}'><head><meta charset='utf-8'>",
+        f"<!DOCTYPE html><html lang=\"{_html_escape(lang)}\"><head><meta charset=\"UTF-8\">",
+        "<meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">",
         f"<title>{_html_escape(t(lang, 'digest_title', date=digest['date']))}</title>",
         f"<style>{css}</style>",
         # Toolbar JS: collapse/expand all + per-summary click prevention on toggle button
         "<script>",
         "function setAll(open){",
-        "  document.querySelectorAll('details.section').forEach(function(d){d.open=open;});",
+        "  document.querySelectorAll('details.section,details.digest-section').forEach(function(d){d.open=open;});",
         "  var c=document.getElementById('btn-collapse');",
         "  var e=document.getElementById('btn-expand');",
         "  if(c)c.style.display=open?'none':'';",
@@ -1269,8 +1759,8 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
         "document.addEventListener('click',function(ev){",
         "  if(ev.target.classList && ev.target.classList.contains('sec-toggle')){",
         "    ev.preventDefault();ev.stopPropagation();",
-        "    var d=ev.target.closest('details.section');",
-        "    if(d){var anyOpen=!!document.querySelector('details.section[open]');setAll(anyOpen);}",
+        "    var d=ev.target.closest('details.section,details.digest-section');",
+        "    if(d){var anyOpen=!!document.querySelector('details.section[open],details.digest-section[open]');setAll(anyOpen);}",
         "  }",
         "});",
         "</script>",
@@ -1280,7 +1770,7 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
         "<div class='toolbar'>",
         "<button id='btn-collapse' onclick='setAll(false)'>全部折叠 / Collapse all</button>",
         "<button id='btn-expand' style='display:none' onclick='setAll(true)'>全部展开 / Expand all</button>",
-        "<span class='hint'>点击节标题折叠 / 展开；用工具条一键全收</span>",
+        "<span class='hint'>点击区段标题折叠/展开；工具栏可一键切换</span>",
         "</div>",
         f"<p class='meta'><b>{_html_escape(t(lang, 'user_label'))}:</b> "
         f"{_html_escape(digest['username'])} (id={digest['userId']})<br>",
@@ -1342,7 +1832,7 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
             if len(s) > 200:
                 s = s[:197].rstrip() + "..."
             if affils:
-                s += f" <i>({', '.join(affils[:4])}{'…' if len(affils) > 4 else ''})</i>"
+                s += f" <i>({', '.join(affils[:4])}{'...' if len(affils) > 4 else ''})</i>"
             lines.append(f"<div class='meta'><b>{_html_escape(t(lang, 'label_authors'))}:</b> {_html_escape(s)}</div>")
         ext = p.get("external_id") or ""
         pub = p.get("pub_url") or ""
@@ -1370,7 +1860,7 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
         if cite:
             misc.append(f"引用: {cite}" if lang == "zh-CN" else f"citations: {cite}")
         if stars:
-            misc.append(f"github {stars} ★")
+            misc.append(f"github {stars} stars")
         if misc:
             lines.append(f"<div class='meta'>{_html_escape(' | '.join(misc))}</div>")
         if code:
@@ -1378,10 +1868,25 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
                          f"<a href='{_html_escape(code)}' target='_blank'>{_html_escape(code)}</a></div>")
         return "\n".join(lines)
 
+    reco_count = len(digest.get("mustRead") or []) + len(digest.get("skim") or [])
+    if lang == "zh-CN":
+        reco_title = f"论文推荐 <span class='sec-count'>{reco_count} 篇</span>"
+    else:
+        reco_title = f"Paper Recommendations <span class='sec-count'>{reco_count}</span>"
+    out.append(
+        "<details class=\"digest-section paper-recommendations\" open>"
+        f"<summary>{reco_title}</summary><div class=\"digest-body\">"
+    )
+    out.append(
+        "<p class='meta'>must_read="
+        f"{len(digest.get('mustRead') or [])} | skim={len(digest.get('skim') or [])} | "
+        f"skip={len(digest.get('skip') or [])}</p>"
+    )
+
     # HF top 10
     hf_top10 = digest.get("huggingFaceTop10") or []
     if hf_top10:
-        out.append(_open_section(f"📊 {_html_escape(t(lang, 'section_hf_daily_top10'))}",
+        out.append(_open_section(_html_escape(t(lang, 'section_hf_daily_top10')),
                                   len(hf_top10)))
         for i, p in enumerate(hf_top10, 1):
             out.append("<div class='paper'>")
@@ -1394,7 +1899,7 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
                 bits.append(f"upvotes={upvotes}")
             if comments is not None:
                 bits.append(f"comments={comments}")
-            out.append(f"<div class='meta'>📊 {' | '.join(bits)}</div>")
+            out.append(f"<div class='meta'>{' | '.join(bits)}</div>")
             for fig_key in ("key_fig_url", "key_tab_url"):
                 img = _img_html((p.get(fig_key) or "").strip())
                 if img:
@@ -1412,7 +1917,7 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
         out.append(_close_section())
 
     # must_read
-    out.append(_open_section(f"📖 {_html_escape(t(lang, 'section_must_read'))}",
+    out.append(_open_section(_html_escape(t(lang, 'section_must_read')),
                               len(digest['mustRead'])))
     if not digest["mustRead"]:
         out.append(f"<p class='empty'>{_html_escape(t(lang, 'label_no_papers'))}</p>")
@@ -1436,7 +1941,7 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
     out.append(_close_section())
 
     # skim
-    out.append(_open_section(f"👀 {_html_escape(t(lang, 'section_skim'))}",
+    out.append(_open_section(_html_escape(t(lang, 'section_skim')),
                               len(digest['skim'])))
     if not digest["skim"]:
         out.append(f"<p class='empty'>{_html_escape(t(lang, 'label_no_papers'))}</p>")
@@ -1466,7 +1971,7 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
     header_suffix = (f" <span class='muted'>({skip_display_n}/{skip_total})</span>"
                      if skip_display_n < skip_total else "")
     out.append(_open_section(
-        f"⏭️ {_html_escape(t(lang, 'section_skip'))}",
+        f"{_html_escape(t(lang, 'section_skip'))}",
         len(skip_papers), extra_suffix=header_suffix))
     if not skip_to_render:
         out.append(f"<p class='empty'>{_html_escape(t(lang, 'label_no_papers'))}</p>")
@@ -1485,9 +1990,37 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
         out.append("</div>")
     out.append(_close_section())
 
+    out.append("</div></details>")
+
+    if lang == "zh-CN":
+        behavior_title = (
+            f"行为总结 <span class='sec-count'>"
+            f"{len(digest.get('actionResults') or [])} 条动作</span>"
+        )
+    else:
+        behavior_title = (
+            f"Behavior Summary <span class='sec-count'>"
+            f"{len(digest.get('actionResults') or [])} actions</span>"
+        )
+    out.append(
+        "<details class=\"digest-section behavior-summary\" open>"
+        f"<summary>{behavior_title}</summary><div class=\"digest-body\">"
+    )
+    source_status = digest.get("sourceStatus") or {}
+    if source_status:
+        bad_sources = [
+            f"{k}:{v.get('status')}" for k, v in source_status.items()
+            if isinstance(v, dict) and v.get("status") not in ("ok", "skipped")
+        ]
+        if bad_sources:
+            out.append(
+                "<p class='meta'>Some sources degraded; available sources were used. "
+                f"{_html_escape(', '.join(bad_sources))}</p>"
+            )
+
     # actions
-    out.append(_format_actions_section_html(digest.get("actionResults") or [],
-                                            lang))
+    out.append(_format_actions_section_html_v2(digest.get("actionResults") or [],
+                                               lang))
 
     # ----- integrated behavior report section -----
     # Same content as the daily_digest.md trailing section, rendered as a
@@ -1501,6 +2034,8 @@ def _render_digest_html(digest: dict[str, Any], lang: str,
             out.append(_behavior_html)
     except Exception as exc:
         out.append(f"<!-- behavior section failed: {exc} -->")
+
+    out.append("</div></details>")
 
     out.append(f"<div class='footer'>{_html_escape(t(lang, 'label_footer'))}</div>")
     out.append("</body></html>")
@@ -1518,7 +2053,7 @@ def _open_section(title: str, count: int, extra_suffix: str = "") -> str:
     suffix_html = extra_suffix or ""
     return (f"<details class='section' open>"
             f"<summary>{title} {count_html}{suffix_html}"
-            f"<span class='sec-toggle' title='全部展开/折叠'>↕</span>"
+            f"<span class='sec-toggle' title='全部展开/折叠'>toggle</span>"
             f"</summary><div class='sec-body'>")
 
 
@@ -1543,20 +2078,20 @@ def _format_actions_section_html(results: list, lang: str) -> str:
                     and r.get("skipped"))
     if not by_paper:
         return (_open_section(
-                    f"🤖 {_html_escape(t(lang, 'section_actions'))}", 0)
+                    _html_escape(t(lang, 'section_actions')), 0)
                 + f"<p class='empty'>{_html_escape(t(lang, 'no_actions'))}</p>"
                 + _close_section())
     out: list[str] = []
     out.append(_open_section(
-        f"🤖 {_html_escape(t(lang, 'section_actions'))}",
+        _html_escape(t(lang, 'section_actions')),
         n_papers, extra_suffix=f" <span class='muted'>/ {len(results)} 动作</span>"))
     out.append("<p class='action-stats'>"
-               f"<span class='stat like'>👍 {_html_escape(t(lang, 'action_like'))} {n_like}</span> "
-               f"<span class='stat collect'>⭐ {_html_escape(t(lang, 'action_collect'))} {n_collect}</span> "
-               f"<span class='stat comment'>💬 {_html_escape(t(lang, 'action_comment'))} {n_comment}</span>")
+               f"<span class='stat like'>{_html_escape(t(lang, 'action_like'))} {n_like}</span> "
+               f"<span class='stat collect'>{_html_escape(t(lang, 'action_collect'))} {n_collect}</span> "
+               f"<span class='stat comment'>{_html_escape(t(lang, 'action_comment'))} {n_comment}</span>")
     if n_skipped:
         if lang == "zh-CN":
-            out.append(f" <span class='muted'>({n_skipped} 已是目标状态,跳过)</span>")
+            out.append(f" <span class='muted'>({n_skipped} 已是目标状态，跳过)</span>")
         else:
             out.append(f" <span class='muted'>({n_skipped} already in desired state)</span>")
     out.append("</p>")
@@ -1570,11 +2105,11 @@ def _format_actions_section_html(results: list, lang: str) -> str:
             ok = r.get("platform", {}).get("ok")
             skipped = r.get("skipped")
             reason = r.get("llm_reason") or ""
-            status = "✅" if ok else "❌"
+            status = "OK" if ok else "SKIP"
             if atype in ("like", "collect"):
                 label = _html_escape(t(lang, "action_like" if atype == "like"
                                         else "action_collect"))
-                emoji = "👍" if atype == "like" else "⭐"
+                emoji = "[like]" if atype == "like" else "[collect]"
                 skipped_html = (f" <span class='muted'>({_html_escape(t(lang, 'skipped_same'))})</span>"
                                 if skipped else "")
                 reason_html = f"<div class='muted'>{_html_escape(reason)}</div>" if reason else ""
@@ -1587,9 +2122,95 @@ def _format_actions_section_html(results: list, lang: str) -> str:
                 full_html = (f"<blockquote>{_html_escape(full)}</blockquote>"
                              if full else "")
                 reason_html = f"<div class='muted'>{_html_escape(reason)}</div>" if reason else ""
-                out.append(f"<div>{status} 💬 <b>{_html_escape(t(lang, 'action_comment'))}</b>"
+                out.append(f"<div>{status} [comment] <b>{_html_escape(t(lang, 'action_comment'))}</b>"
                            f" <span class='stance-pill stance-{_html_escape(stance)}'>{stance_label}</span></div>"
                            f"{full_html}{reason_html}")
+        out.append("</article>")
+    out.append(_close_section())
+    return "\n".join(out)
+
+
+def _format_actions_section_html_v2(results: list, lang: str) -> str:
+    by_paper: dict[str, dict[str, Any]] = {}
+    for r in results:
+        pid = r.get("paperId")
+        key = str(pid) if pid is not None else "local"
+        by_paper.setdefault(key, {
+            "title": r.get("title") or ("Local feedback" if key == "local" else "?"),
+            "actions": [],
+        })["actions"].append(r)
+
+    title = "Today's Agent Actions" if lang == "en-US" else "今日智能体动作"
+    if not results:
+        return (
+            _open_section(title, 0)
+            + "<p class='empty'>no actions passed gate yet: no_eligible_comment / "
+            "quality_gate_failed / rate_limited / duplicate_or_seen</p>"
+            + _close_section()
+        )
+
+    stats = {
+        "like": sum(1 for r in results if r.get("actionType") == "like"),
+        "collect": sum(1 for r in results if r.get("actionType") == "collect"),
+        "comment": sum(1 for r in results if r.get("actionType") == "comment"),
+        "reply": sum(1 for r in results if r.get("actionType") == "reply"),
+        "comment_like": sum(
+            1 for r in results if r.get("actionType") == "comment_like"
+        ),
+        "skipped": sum(1 for r in results if r.get("skipped")),
+    }
+    out: list[str] = [
+        _open_section(
+            title,
+            len(by_paper),
+            extra_suffix=f" <span class='muted'>/ {len(results)} actions</span>",
+        ),
+        "<p class='action-stats'>"
+        f"<span class='stat like'>like {stats['like']}</span> "
+        f"<span class='stat collect'>collect {stats['collect']}</span> "
+        f"<span class='stat comment'>comment {stats['comment']}</span> "
+        f"<span class='stat comment'>reply {stats['reply']}</span> "
+        f"<span class='stat like'>comment_like {stats['comment_like']}</span> "
+        f"<span class='muted'>skipped {stats['skipped']}</span></p>",
+    ]
+    for i, (pid, info) in enumerate(by_paper.items(), 1):
+        out.append(f"<article class='action-card' data-paper-id='{_html_escape(pid)}'>")
+        out.append(
+            f"<h3 class='action-title'>{i}. {_html_escape(info['title'])} "
+            f"<span class='paper-id'>id={_html_escape(pid)}</span></h3>"
+        )
+        for r in info["actions"]:
+            atype = str(r.get("actionType") or "?")
+            platform = r.get("platform") if isinstance(r.get("platform"), dict) else {}
+            ok = bool(platform.get("ok"))
+            skipped = bool(r.get("skipped") or platform.get("skipped"))
+            status = "OK" if ok and not skipped else "SKIP" if skipped else "FAIL"
+            reason = str(r.get("reason") or r.get("llm_reason") or "")
+            skip_reason = str(r.get("skipReason") or platform.get("reason") or "")
+            gate_html = (
+                f"<span class='gate-reason'>{_html_escape(skip_reason)}</span>"
+                if skip_reason else ""
+            )
+            parent = r.get("parentCommentId") or r.get("commentId")
+            parent_html = (
+                f" <span class='paper-id'>parent={_html_escape(str(parent))}</span>"
+                if parent and atype == "reply" else ""
+            )
+            out.append(
+                f"<div><b>{_html_escape(status)}</b> "
+                f"<b>{_html_escape(atype)}</b>{parent_html}{gate_html}</div>"
+            )
+            content = (
+                r.get("commentContent")
+                or r.get("replyContent")
+                or r.get("content_full")
+                or r.get("content_preview")
+                or ""
+            )
+            if content:
+                out.append(f"<blockquote>{_html_escape(str(content))}</blockquote>")
+            if reason:
+                out.append(f"<div class='muted'>{_html_escape(reason)}</div>")
         out.append("</article>")
     out.append(_close_section())
     return "\n".join(out)
@@ -1783,13 +2404,13 @@ def _format_actions_section_md(results: list, proposals: list,
     out.append(head)
     out.append("")
     if lang == "zh-CN":
-        stats = f"**统计:** 👍 {n_like} / ⭐ {n_collect} / 💬 {n_comment}"
+        stats = f"**统计:** 点赞 {n_like} / 收藏 {n_collect} / 评论 {n_comment}"
         if n_skipped:
             stats += f" _(其中 {n_skipped} 个 like/collect 因已是目标状态而跳过)_"
     else:
-        stats = f"**Stats:** 👍 {n_like} / ⭐ {n_collect} / 💬 {n_comment}"
+        stats = f"**Stats:** likes {n_like} / collects {n_collect} / comments {n_comment}"
         if n_skipped:
-            stats += f" _({n_skipped} skipped — already in desired state)_"
+            stats += f" _({n_skipped} skipped - already in desired state)_"
     out.append(stats)
     out.append("")
     if not by_paper:
@@ -1805,10 +2426,10 @@ def _format_actions_section_md(results: list, proposals: list,
         for r in info["actions"]:
             atype = r.get("actionType", "?")
             ok = r.get("platform", {}).get("ok")
-            status = "✅" if ok else "❌"
+            status = "OK" if ok else "SKIP"
             skipped = r.get("skipped")
             if atype in ("like", "collect"):
-                emoji = "👍" if atype == "like" else "⭐"
+                emoji = "[like]" if atype == "like" else "[collect]"
                 label = t(lang, "action_like" if atype == "like" else "action_collect")
                 line = f"- {status} {emoji} **{label}**"
                 if skipped:
@@ -1819,7 +2440,7 @@ def _format_actions_section_md(results: list, proposals: list,
                 out.append(line)
             elif atype == "comment":
                 stance = r.get("stance", "thinking")
-                out.append(f"- {status} 💬 **{t(lang, 'action_comment')}** [{stance}]")
+                out.append(f"- {status} [comment] **{t(lang, 'action_comment')}** [{stance}]")
                 full = r.get("content_full") or r.get("content_preview") or ""
                 if full:
                     out.append("")
@@ -1954,11 +2575,126 @@ def handle_feedback(argv: list[str]) -> int:
     print(f"[ok] feedback {action} {target} reason={args.get('reason','')!r}")
     if undo_results:
         for u in undo_results:
-            mark = "✓" if u.get("ok") else "✗"
+            mark = "OK" if u.get("ok") else "SKIP"
             skipped = " (skipped)" if u.get("skipped") else ""
             print(f"  {mark} undo {u['kind']}{skipped}")
     if undo_warning:
         print(f"  ! {undo_warning}")
+    return 0
+
+
+# ---------- Batch action executor ----------
+
+def handle_execute_actions(argv: list[str]) -> int:
+    for stream in (sys.stdout, sys.stderr):
+        try:
+            stream.reconfigure(encoding="utf-8", errors="replace")
+        except (AttributeError, OSError):
+            pass
+    action_file = _parse_flag(argv, "file")
+    if not action_file:
+        action_file = "agent_actions.json"
+    dry_run = "dry-run" in argv or "--dry-run" in argv
+    date_str = _parse_flag(argv, "date")
+    if not date_str:
+        date_str = datetime.now().astimezone().strftime("%Y-%m-%d")
+    home = agent_home()
+    path = Path(action_file).expanduser()
+    if not path.is_absolute():
+        candidate = home / "runs" / date_str / action_file
+        path = candidate if candidate.exists() else Path.cwd() / action_file
+    if not path.exists():
+        print(f"[fatal] action file not found: {path}",
+              file=sys.stderr, flush=True)
+        return 2
+    try:
+        payload = load_json(path, None)
+    except json.JSONDecodeError as exc:
+        print(f"[fatal] invalid action JSON: {exc}", file=sys.stderr, flush=True)
+        return 2
+    actions = _extract_actions(payload)
+    if not actions:
+        print("[fatal] no actions found; expected a list or {\"actions\": [...]}.",
+              file=sys.stderr, flush=True)
+        return 2
+    creds = load_json(home / "credentials.json", None)
+    if not creds:
+        if dry_run:
+            creds = {}
+            token = ""
+            user_id = 0
+            username = ""
+        else:
+            print(t(DEFAULT_LANG, "fatal_credentials_missing"),
+                  file=sys.stderr, flush=True)
+            return 2
+    else:
+        token = exchange_api_key(creds["apiKey"])
+        me = get_me(token)
+        user_id = me.get("userId")
+        username = me.get("username") or creds.get("username") or ""
+    if user_id is None:
+        print("[fatal] /api/auth/me did not return userId",
+              file=sys.stderr, flush=True)
+        return 1
+    policy = load_policy(home)
+    import engagement as _eng
+    engagement_state = _eng.load_engagement(home)
+    _eng.sync_state_to_trust(engagement_state)
+    interaction_state = load_interaction_state(home)
+    results = [
+        _execute_one_action(
+            home, action, token, int(user_id), username, policy, engagement_state,
+            interaction_state, dry_run,
+        )
+        for action in actions
+    ]
+    if not dry_run:
+        _eng.save_engagement(home, engagement_state)
+        save_interaction_state(home, interaction_state)
+    run_dir = home / "runs" / date_str
+    run_dir.mkdir(parents=True, exist_ok=True)
+    save_json(run_dir / "agent_action_results.json", results)
+    existing_digest = _load_today_digest(run_dir)
+    stored_lang = (
+        existing_digest.get("language", {}).get("stored")
+        if isinstance(existing_digest.get("language"), dict) else None
+    ) or resolve_lang(policy, "stored")
+    digest_lang = (
+        existing_digest.get("language", {}).get("digest")
+        if isinstance(existing_digest.get("language"), dict) else None
+    ) or resolve_lang(policy, "digest")
+    if existing_digest:
+        merged = _merge_digest(existing_digest, {
+            "date": date_str,
+            "actionResults": results,
+            "heartbeatSummary": {
+                **(existing_digest.get("heartbeatSummary") or {}),
+                "lastExecuteActionsAt": utc_now_iso(),
+                "lastExecuteActionsDryRun": dry_run,
+                "lastExecuteActionsCount": len(actions),
+            },
+        }, policy)
+        _rerender_digest_files(run_dir, merged, stored_lang, digest_lang,
+                               inline_images=not dry_run)
+    save_json(run_dir / "heartbeat_summary.json", {
+        **(load_json(run_dir / "heartbeat_summary.json", {}) or {}),
+        "lastExecuteActionsAt": utc_now_iso(),
+        "lastExecuteActionsCount": len(actions),
+        "lastExecuteActionsDryRun": dry_run,
+        "actionResultsOk": sum(1 for r in results if r.get("platform", {}).get("ok")),
+        "actionResultsSkipped": sum(1 for r in results if r.get("skipped")),
+    })
+    ok_count = sum(1 for r in results if r.get("platform", {}).get("ok"))
+    skipped = sum(1 for r in results if r.get("skipped"))
+    print(json.dumps({
+        "ok": True,
+        "dryRun": dry_run,
+        "actions": len(actions),
+        "okCount": ok_count,
+        "skipped": skipped,
+        "resultsPath": str(run_dir / "agent_action_results.json"),
+    }, ensure_ascii=False))
     return 0
 
 
@@ -2082,16 +2818,18 @@ def handle_home(argv: list[str]) -> int:
         home, today_date=today_date,
         token=token, user_id=user_id, username=username,
     )
-
     if as_json:
         print(json.dumps(home_data, ensure_ascii=False, indent=2))
     elif quiet:
         acct = home_data.get("yourAccount", {})
+        interactions = home_data.get("interactions") or {}
+        unread = interactions.get("unreadReplies") or []
         print(f"trust={acct.get('trustLevel')} score={acct.get('trustScore')} "
               f"today(评论/点赞/收藏)={acct.get('today',{}).get('commentsPosted',0)}/"
               f"{acct.get('today',{}).get('postLikes',0)}/"
               f"{acct.get('today',{}).get('postCollects',0)} "
-              f"whatToDoNext={len(home_data.get('whatToDoNext',[]))}")
+              f"whatToDoNext={len(home_data.get('whatToDoNext',[]))} "
+              f"unreadReplies={len(unread) if isinstance(unread, list) else 0}")
     else:
         print(render_home_text(home_data))
     return 0
@@ -2321,7 +3059,7 @@ def handle_paper_download(argv: list[str]) -> int:
         return 2
     out_path = _parse_flag(argv, "out")
     home = agent_home()
-    policy = load_json(home / "policy.json", {})
+    policy = load_policy(home)
     if not policy.get("allowPdfDownload", False):
         print("[fatal] policy.allowPdfDownload=false; set it to true first",
               file=sys.stderr, flush=True)
@@ -2468,18 +3206,18 @@ def handle_set_like(argv: list[str]) -> int:
     import engagement as _eng
     state = _eng.load_engagement(home)
     _eng.sync_state_to_trust(state)
-    policy = load_json(home / "policy.json", {})
+    policy = load_policy(home)
     capability = "autoLike"
     user_approved = "user-approved" in argv
     ok, reason = _eng.can_perform(policy, capability, state["trustLevel"],
                                    user_approved=user_approved)
     if not ok:
-        print(f"[skip] set-like {pid} → {desired}: {reason}",
+        print(f"[skip] set-like {pid} ->{desired}: {reason}",
               file=sys.stderr, flush=True)
         return 0
     can, can_reason, _ = _eng.can_act(state, "postLike")
     if not can:
-        print(f"[skip] set-like {pid} → {desired}: {can_reason}",
+        print(f"[skip] set-like {pid} ->{desired}: {can_reason}",
               file=sys.stderr, flush=True)
         return 0
     res = _set_state(token, pid, "like", user_id, username,
@@ -2508,15 +3246,15 @@ def handle_set_collect(argv: list[str]) -> int:
     import engagement as _eng
     state = _eng.load_engagement(home)
     _eng.sync_state_to_trust(state)
-    policy = load_json(home / "policy.json", {})
+    policy = load_policy(home)
     ok, reason = _eng.can_perform(policy, "autoCollect", state["trustLevel"])
     if not ok:
-        print(f"[skip] set-collect {pid} → {desired}: {reason}",
+        print(f"[skip] set-collect {pid} ->{desired}: {reason}",
               file=sys.stderr, flush=True)
         return 0
     can, can_reason, _ = _eng.can_act(state, "postCollect")
     if not can:
-        print(f"[skip] set-collect {pid} → {desired}: {can_reason}",
+        print(f"[skip] set-collect {pid} ->{desired}: {can_reason}",
               file=sys.stderr, flush=True)
         return 0
     res = _set_state(token, pid, "collect", user_id, username,
@@ -2545,7 +3283,7 @@ def handle_post_comment(argv: list[str]) -> int:
     import engagement as _eng
     state = _eng.load_engagement(home)
     _eng.sync_state_to_trust(state)
-    policy = load_json(home / "policy.json", {})
+    policy = load_policy(home)
     capability = "autoReply" if parent_id else "autoComment"
     user_approved = "user-approved" in argv
     ok, reason = _eng.can_perform(policy, capability, state["trustLevel"],
@@ -2587,7 +3325,7 @@ def handle_like_comment(argv: list[str]) -> int:
     import engagement as _eng
     state = _eng.load_engagement(home)
     _eng.sync_state_to_trust(state)
-    policy = load_json(home / "policy.json", {})
+    policy = load_policy(home)
     ok, reason = _eng.can_perform(policy, "autoCommentLike", state["trustLevel"])
     if not ok:
         print(f"[skip] like-comment {cid}: {reason}", file=sys.stderr, flush=True)
@@ -2638,21 +3376,16 @@ def handle_record_action(argv: list[str]) -> int:
 
 # ---------- Behavior report subcommands ----------
 #
-# v2026-06-04: 行为报告与每日 digest 合并成单一对文件
-#   daily_digest.{lang}.{md,html}  末尾追加 "## 行为报告" 区段
+# v2026-06-04: behavior reports are embedded in daily digest files.
+#   daily_digest.{lang}.{md,html} appends a behavior report section.
 #
-# 子命令:
-#   report-yesterday  → 重渲染指定日期的 daily_digest（自带行为区段）
-#   report-week       → 聚合到 runs/weekly-reports/YYYY-Www.{md,html}（内含每
-#                        日 digest 行为区段 + 周聚合统计）
-#   report-month      → 同上，聚合到 runs/monthly-reports/YYYY-MM.{md,html}
+# Subcommands:
+#   report-yesterday  -> re-render the selected daily digest.
+#   report-week       -> aggregate to runs/weekly-reports/YYYY-Www.{md,html}.
+#   report-month      -> aggregate to runs/monthly-reports/YYYY-MM.{md,html}.
 
 def handle_report_yesterday(argv: list[str]) -> int:
-    """重新生成昨日（或 --date YYYY-MM-DD）的整合 daily_digest。
-
-    由于行为区段已嵌在 daily_digest 内，本命令实际上就是调一次
-    render-html 强制刷新 — 用户读的就是 daily_digest.{lang}.{md,html}。
-    """
+    """Re-render yesterday's integrated daily digest."""
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -2669,7 +3402,7 @@ def handle_report_yesterday(argv: list[str]) -> int:
                           "md_path": None, "html_path": None},
                          ensure_ascii=False))
         return 1
-    # Re-render the unified HTML (行为区段会自动嵌入)
+    # Re-render the unified HTML; the behavior section is embedded automatically.
     rc = handle_render_html(["--date", date_str])
     md_path = None
     html_path = None
@@ -2693,10 +3426,7 @@ def handle_report_yesterday(argv: list[str]) -> int:
 
 
 def handle_report_week(argv: list[str]) -> int:
-    """生成周报：runs/weekly-reports/YYYY-Www.{md,html}。
-
-    内容 = 周聚合统计 + 每日 digest 行为区段（嵌入）
-    """
+    """Generate weekly rollup reports."""
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -2725,7 +3455,7 @@ def handle_report_week(argv: list[str]) -> int:
 
     # HTML
     html_body = br.build_aggregated_behavior_html(home, dates, title)
-    # Append per-day behavior sections (HTML) — strip <html><head> wrapper
+    # Append per-day behavior sections (HTML); strip <html><head> wrapper
     # from subsequent fragments and inline.
     extra = []
     for d in dates:
@@ -2755,7 +3485,7 @@ def handle_report_week(argv: list[str]) -> int:
 
 
 def handle_report_month(argv: list[str]) -> int:
-    """生成月报：runs/monthly-reports/YYYY-MM.{md,html}。"""
+    """Generate monthly rollup reports."""
     for stream in (sys.stdout, sys.stderr):
         try:
             stream.reconfigure(encoding="utf-8", errors="replace")
@@ -2901,20 +3631,12 @@ def handle_heartbeat(argv: list[str]) -> int:
         print(t(DEFAULT_LANG, "fatal_credentials_missing"),
               file=sys.stderr, flush=True)
         return 2
-    policy = load_json(home / "policy.json", {})
+    policy = load_policy(home)
     comment_lang = resolve_lang(policy, "comment")
     today = datetime.now().astimezone().strftime("%Y-%m-%d")
     run_dir = home / "runs" / (f"{today}-dry-run" if dry_run else today)
-    # Backup any existing run for today so a partial-failure run doesn't
-    # silently leave stale files that the next successful run would
-    # overwrite piecemeal.
-    if run_dir.exists():
-        ts = datetime.now().astimezone().strftime("%H%M%S")
-        backup = run_dir.with_name(f"{run_dir.name}-failed-{ts}")
-        run_dir.rename(backup)
-        print(f"[info] backed up previous run to {backup.name}",
-              flush=True)
     run_dir.mkdir(parents=True, exist_ok=True)
+    existing_digest = _load_today_digest(run_dir)
     token = exchange_api_key(creds["apiKey"])
     me = get_me(token)
     user_id = me.get("userId")
@@ -2931,6 +3653,33 @@ def handle_heartbeat(argv: list[str]) -> int:
         **heartbeat_summary, "mode": "heartbeat",
         "paperCount": len(papers), "generatedAt": utc_now_iso(),
     })
+    if existing_digest:
+        stored_lang = (
+            existing_digest.get("language", {}).get("stored")
+            if isinstance(existing_digest.get("language"), dict) else None
+        ) or resolve_lang(policy, "stored")
+        digest_lang = (
+            existing_digest.get("language", {}).get("digest")
+            if isinstance(existing_digest.get("language"), dict) else None
+        ) or resolve_lang(policy, "digest")
+        merged = _merge_digest(existing_digest, {
+            "date": today,
+            "replyProposals": reply_proposals,
+            "replyResults": reply_results,
+            "heartbeatSummary": {
+                **(existing_digest.get("heartbeatSummary") or {}),
+                **heartbeat_summary,
+                "mode": "heartbeat",
+                "lastHeartbeatAt": utc_now_iso(),
+            },
+            "discussionStatus": {
+                "scannedComments": heartbeat_summary.get("scannedComments", 0),
+                "replyProposals": heartbeat_summary.get("replyProposals", 0),
+                "commentLikeProposals": heartbeat_summary.get("commentLikeProposals", 0),
+            },
+        }, policy)
+        _rerender_digest_files(run_dir, merged, stored_lang, digest_lang,
+                               inline_images=not dry_run)
     if not dry_run:
         save_interaction_state(home, state)
     print(f"HEARTBEAT_OK papers={len(papers)} comments={heartbeat_summary['scannedComments']} "
@@ -2953,6 +3702,8 @@ def main() -> int:
         return handle_feedback(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "heartbeat":
         return handle_heartbeat(sys.argv[2:])
+    if len(sys.argv) > 1 and sys.argv[1] == "execute-actions":
+        return handle_execute_actions(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "render-html":
         return handle_render_html(sys.argv[2:])
     if len(sys.argv) > 1 and sys.argv[1] == "home":
@@ -3015,7 +3766,7 @@ def main() -> int:
               "paper-detail|paper-likes|paper-collects|paper-comments|paper-interactions|"
               "paper-download|paper-core-knowledge|paper-related-papers|my-latest-papers|"
               "hf-token-status|keywords-suggest|set-like|set-collect|post-comment|post-reply|"
-              "like-comment|record-action|heartbeat|feedback|render-html|"
+              "like-comment|record-action|execute-actions|heartbeat|feedback|render-html|"
               "dry-run|--dry-run|home]",
               flush=True)
         return 0
@@ -3026,7 +3777,7 @@ def main() -> int:
         print(t(DEFAULT_LANG, "fatal_credentials_missing"),
               file=sys.stderr, flush=True)
         return 2
-    policy = load_json(home / "policy.json", {})
+    policy = load_policy(home)
     persona = load_json(home / "persona.json", {})
 
     feedback_lang = resolve_lang(policy, "feedback")
@@ -3036,6 +3787,7 @@ def main() -> int:
 
     today = datetime.now().astimezone().strftime("%Y-%m-%d")
     run_dir = home / "runs" / (f"{today}-dry-run" if dry_run else today)
+    existing_digest = _load_today_digest(run_dir)
     # Backup any existing run for today so a partial-failure run doesn't
     # silently leave stale files that the next successful run would
     # overwrite piecemeal.
@@ -3059,6 +3811,17 @@ def main() -> int:
     me = get_me(token)
     user_id = me.get("userId")
     username = me.get("username")
+    interaction_state = load_interaction_state(home)
+    source_status: dict[str, dict[str, Any]] = {}
+    source_status["auth_me"] = {
+        "status": "ok",
+        "userId": user_id,
+        "username": username,
+    }
+    source_status["local_interaction_state"] = {
+        "status": "ok",
+        "lastHeartbeatAt": interaction_state.get("lastHeartbeatAt"),
+    }
     interests = get_interests(token)
     focus_terms = interests or persona.get("preferred_concepts") or []
     focus_tokens = _focus_tokens(focus_terms)
@@ -3066,13 +3829,32 @@ def main() -> int:
     print(t(feedback_lang, "stage"), "->", t(feedback_lang, "discovery"),
           flush=True)
 
-    page_size = policy.get("dailyPageSize", 20)
+    page_size = int(policy.get("dailyPageSize", 20) or 20)
+    dry_run_limits: dict[str, int] = {}
+    if dry_run:
+        requested_page_size = page_size
+        page_size = min(
+            page_size,
+            int(policy.get("dryRunPageSize", DEFAULT_DRY_RUN_PAGE_SIZE)
+                or DEFAULT_DRY_RUN_PAGE_SIZE),
+        )
+        dry_run_limits["requestedPageSize"] = requested_page_size
+        dry_run_limits["pageSize"] = page_size
     newest_window = policy.get("newestTimeRange", "1d")
     enable_newest = bool(policy.get("enableNewestSource", True))
     search_mode = policy.get("searchMode", "auto")
     enable_hf_daily = bool(policy.get("enableHuggingFaceDailySource", True))
     enable_hf_weekly = bool(policy.get("enableHuggingFaceWeeklySource", False))
     hf_top_n = int(policy.get("hfTopN", 10))
+    if dry_run:
+        requested_hf_top_n = hf_top_n
+        hf_top_n = min(
+            hf_top_n,
+            int(policy.get("dryRunHfTopN", DEFAULT_DRY_RUN_HF_TOP_N)
+                or DEFAULT_DRY_RUN_HF_TOP_N),
+        )
+        dry_run_limits["requestedHfTopN"] = requested_hf_top_n
+        dry_run_limits["hfTopN"] = hf_top_n
 
     src_newest: list[dict[str, Any]] = []
     if enable_newest:
@@ -3106,6 +3888,30 @@ def main() -> int:
         "interest_queries": list(interest_terms),
         "search_mode": search_mode,
     }
+    source_status.update({
+        "newest": {
+            "status": "ok" if (not enable_newest or src_newest) else "empty",
+            "count": len(src_newest),
+        },
+        "recommendations": {
+            "status": "ok" if src_recommendations else "empty",
+            "count": len(src_recommendations),
+        },
+        "huggingface_daily": {
+            "status": "ok" if (not enable_hf_daily or src_hf_daily) else "empty",
+            "count": len(src_hf_daily),
+        },
+        "interest_search": {
+            "status": "ok" if src_interest else "empty",
+            "count": len(src_interest),
+        },
+    })
+    if dry_run:
+        source_status["dry_run_limits"] = {
+            "status": "limited",
+            "reason": "dry_run_keeps_network_and_rendering_bounded",
+            **dry_run_limits,
+        }
     print(f"[info] discovery: newest={source_report['newest']} "
           f"recommendations={source_report['recommendations']} "
           f"hf_daily={source_report['huggingface_daily']} "
@@ -3135,7 +3941,16 @@ def main() -> int:
               flush=True)
 
     candidates = dedupe(raw_after_seen)
-    max_details = policy.get("dailyMaxDetails", 30)
+    max_details = int(policy.get("dailyMaxDetails", 30) or 30)
+    if dry_run:
+        requested_max_details = max_details
+        max_details = min(
+            max_details,
+            int(policy.get("dryRunMaxDetails", DEFAULT_DRY_RUN_MAX_DETAILS)
+                or DEFAULT_DRY_RUN_MAX_DETAILS),
+        )
+        dry_run_limits["requestedMaxDetails"] = requested_max_details
+        dry_run_limits["maxDetails"] = max_details
     candidates = candidates[:max_details]
     if len(candidates) < max_details:
         print(f"[warn] post-dedup candidates={len(candidates)} < "
@@ -3149,8 +3964,8 @@ def main() -> int:
             detailed.append(d)
         else:
             # paper_detail transient failed (e.g. ProxyError). The candidate
-            # dict from discovery already has title/abstract/category —
-            # keep it as a degraded entry. triage() will still classify by
+            # dict from discovery already has title/abstract/category; keep it
+            # as a degraded entry. triage() will still classify by
             # core_hits/token_hits from whatever fields the candidate has.
             print(f"[warn] paper_detail {c.get('id')} failed after retries; "
                   f"using discovery metadata as fallback", file=sys.stderr,
@@ -3175,7 +3990,7 @@ def main() -> int:
         d = paper_detail(pid_int) or (hp if hp.get("title") else None)
         if not d:
             # paper_detail failed AND hf metadata has no title (matched=false
-            # in HF upstream). Skip — never include a paper with no
+            # in HF upstream). Skip; never include a paper with no
             # title/abstract in the digest (would be a garbage row).
             print(f"[warn] HF paper {pid_int} skipped: detail failed + "
                   f"no title in HF metadata", file=sys.stderr, flush=True)
@@ -3344,47 +4159,31 @@ def main() -> int:
     for e in skim_ranked:
         ranked_for_actions.append({**e, "bucket": "skim"})
 
-    # v3.1: main does NOT auto-execute writes. It generates an
-    # `actions_proposal.json` listing each ranked paper with suggested
-    # actions (like / collect / comment). The agent reads the proposal
-    # in its next heartbeat, decides what to do, and calls
-    # `set-like` / `set-collect` / `post-comment` subcommands itself.
-    # (No external LLM, no template fallback — agent is the writer.)
-    proposals: list[dict[str, Any]] = []
-    results: list[dict[str, Any]] = []  # empty in v3.1
+    # Main does not execute platform writes. It emits action proposals;
+    # the external agent writes agent_actions.json and execute-actions gates it.
+    results: list[dict[str, Any]] = []
+    proposal_papers: list[dict[str, Any]] = []
     for entry in ranked_for_actions:
-        detail = entry.get("detail", {})
-        paper_id = detail.get("id")
-        if paper_id is None:
-            continue
-        bucket = entry.get("bucket", "must_read")
-        score = entry.get("score", 0)
-        proposals.append({
-            "paperId": paper_id,
-            "title":   detail.get("title", ""),
-            "bucket":  bucket,
-            "score":   score,
-            "suggestions": {
-                "like":    True,
-                "collect": True,
-                "comment": bucket == "must_read",
-            },
-            "commentLanguage": comment_lang,
-            "note": "agent 自行决定写什么评论, 调 set-like/collect/post-comment",
-        })
+        detail = dict(entry.get("detail", {}))
+        detail["bucket"] = entry.get("bucket", "must_read")
+        detail["score"] = entry.get("score", 0)
+        proposal_papers.append(detail)
+    proposals = _build_action_proposals_for_papers(
+        proposal_papers, comment_lang, policy,
+    )
     save_json(run_dir / "action_proposals.json", proposals)
     print(f"[info] wrote {len(proposals)} action proposals to "
           f"action_proposals.json (agent will decide in heartbeat)",
           flush=True)
 
-    state = load_interaction_state(home)
     reply_proposals, reply_results, heartbeat_summary = process_comment_interactions(
         token, user_id, username,
         [e["detail"] for e in ranked_for_actions],
-        policy, state, comment_lang, dry_run=dry_run,
+        policy, interaction_state, comment_lang, dry_run=dry_run,
     )
     if not dry_run:
-        save_interaction_state(home, state)
+        interaction_state["lastHeartbeatAt"] = utc_now_iso()
+        save_interaction_state(home, interaction_state)
 
     digest = {
         "date": today,
@@ -3418,21 +4217,17 @@ def main() -> int:
         },
     }
 
+    digest["sourceStatus"] = source_status
+    digest["discussionStatus"] = {
+        "scannedComments": heartbeat_summary.get("scannedComments", 0),
+        "replyProposals": heartbeat_summary.get("replyProposals", 0),
+        "commentLikeProposals": heartbeat_summary.get("commentLikeProposals", 0),
+    }
+    digest = _merge_digest(existing_digest, digest, policy)
     save_json(run_dir / "evidence_pack.json", evidence_pack)
-    save_json(run_dir / "daily_digest.json", digest)
-    (run_dir / f"daily_digest.{stored_lang}.md").write_text(
-        render_digest_md(digest, digest_lang), encoding="utf-8",
-    )
-    # HTML companion: self-contained, with key figures inlined as
-    # data: URIs so it renders fully offline in any browser. On dry-run
-    # we skip image inlining (the file still works, with images served
-    # from the platform's image CDN).
     try:
-        html_text = _render_digest_html(digest, stored_lang,
-                                         inline_images=not dry_run)
-        (run_dir / f"daily_digest.{stored_lang}.html").write_text(
-            html_text, encoding="utf-8",
-        )
+        _rerender_digest_files(run_dir, digest, stored_lang, digest_lang,
+                               inline_images=not dry_run)
         if dry_run:
             print("[info] dry-run: wrote lightweight html (no image inlining)",
                   flush=True)
@@ -3445,7 +4240,9 @@ def main() -> int:
     save_json(run_dir / "reply_results.json", reply_results)
     save_json(run_dir / "heartbeat_summary.json", {
         **heartbeat_summary, "mode": "daily",
-        "paperCount": len(ranked_for_actions), "generatedAt": utc_now_iso(),
+        "paperCount": len(ranked_for_actions),
+        "sourceStatus": source_status,
+        "generatedAt": utc_now_iso(),
     })
     save_json(run_dir / "persona_update.json", {
         "userId": str(user_id), "eventType": "daily_run",
