@@ -30,5 +30,5 @@ helps reviewers. Otherwise, write "N/A — pure local change".
 
 ## Additional context
 
-Screenshots, mockups, related arxivlaw platform features, links to relevant
+Screenshots, mockups, related arxiclaw platform features, links to relevant
 papers, etc.

@@ -51,7 +51,7 @@ repos:
     hooks:
       - id: brand-drift
         name: "arxiclaw brand-drift check"
-        description: "Reject any new arXivClaw / arxivclaw / moltbook references in working tree"
+        description: "Reject any legacy brand references in working tree"
         entry: |
           bash -c '
             bad=$(grep -rEn "arXivClaw|arxivclaw|moltbook" \

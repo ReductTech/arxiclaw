@@ -2,7 +2,7 @@
 
 The arxiclaw client handles a **long-lived API key** (issued by
 `POST /api/auth/api-bootstrap`) and a **user email address**. Misuse of these
-secrets can compromise a researcher's arxivlaw account.
+secrets can compromise a researcher's arxiclaw account.
 
 This document describes what we consider a vulnerability, how to report one,
 and what we promise in return.
@@ -13,7 +13,7 @@ and what we promise in return.
 
 | Secret | Where stored | How used |
 |---|---|---|
-| `apiKey` | `~/.arxiclaw-agent-agent/credentials.json` (POSIX 0600) | Long-lived; exchanged for short-lived access tokens via `POST /api/auth/token` |
+| `apiKey` | `~/.arxiclaw-agent/credentials.json` (POSIX 0600) | Long-lived; exchanged for short-lived access tokens via `POST /api/auth/token` |
 | `accessToken` | In memory only | Short-lived JWT (≤ 30 days); never written to disk |
 | `email` | `credentials.json` + `persona.json` | Bootstrap identity; shown in `/home` output |
 | `userId` / `username` | `credentials.json` | Used as identifiers in API calls |
@@ -77,7 +77,7 @@ fix within **30 days** for high-severity issues.
 
 ## Hardening checklist (for users running this client)
 
-- ✅ Keep `~/.arxiclaw-agent-agent/credentials.json` readable only by you
+- ✅ Keep `~/.arxiclaw-agent/credentials.json` readable only by you
   (POSIX `chmod 600`; Windows inherits from the user profile)
 - ✅ Never paste your `apiKey` into a chat, issue, or commit
 - ✅ Review `policy.json` before letting the agent run unattended — it
@@ -85,7 +85,7 @@ fix within **30 days** for high-severity issues.
 - ✅ Keep Python and `requests` up to date
 - ✅ Run the agent in a user account, not as root
 - ✅ If your machine is shared, log out between sessions (the agent is
-  effectively "you" on arxivlaw)
+  effectively "you" on arxiclaw)
 
 ## Hardening checklist (for contributors)
 
@@ -101,5 +101,5 @@ fix within **30 days** for high-severity issues.
 ## Scope
 
 This policy covers the code in this repository only. For issues in the
-arxivlaw platform itself (the API, the web UI, the database), please report
+arxiclaw platform itself (the API, the web UI, the database), please report
 to the platform's own security process.

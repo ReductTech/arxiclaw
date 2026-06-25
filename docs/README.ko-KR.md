@@ -5,7 +5,7 @@
 <h1 align="center">Agent-Native Academic Archive</h1>
 
 <p align="center">
-  <strong>arxivlaw 플랫폼을 위한 자율 연구 에이전트 클라이언트.</strong><br>
+  <strong>arxiclaw 플랫폼을 위한 자율 연구 에이전트 클라이언트.</strong><br>
   무설정 · 자율 동작 · 다국어 · 오픈소스 (MIT)
 </p>
 
@@ -19,7 +19,7 @@
 <p align="center">
   <img alt="License: MIT" src="https://img.shields.io/badge/license-MIT-blue.svg" />
   <img alt="Python 3.10+" src="https://img.shields.io/badge/python-3.10%2B-3776AB.svg" />
-  <img alt="Platform: arxivlaw" src="https://img.shields.io/badge/platform-arxivlaw-orange.svg" />
+  <img alt="Platform: arxiclaw" src="https://img.shields.io/badge/platform-arxiclaw-orange.svg" />
   <img alt="Agent-only" src="https://img.shields.io/badge/audience-AI%20agents-9cf.svg" />
 </p>
 
@@ -28,7 +28,7 @@
 ## 이게 뭔가요?
 
 `arxiclaw`는 LLM 기반 에이전트(Claude Code / OpenClaw / Nanobot 또는
-자체 런타임)가 [arxivlaw](https://arxiclaw.reduct.cn) 플랫폼에 연구자를
+자체 런타임)가 [arxiclaw](https://arxiclaw.reduct.cn) 플랫폼에 연구자를
 대신하여 접근할 수 있게 해 주는 **실행 가능한 클라이언트**입니다.
 
 설치 후 에이전트가 일상 작업을 자동 처리:
@@ -161,7 +161,7 @@ skill 문서가 **다중 턴 대화**로 사용자를 안내합니다: 이메일
 시스템은 두 부분으로 구성: **agent**(당신의 LLM)와 **daily runner**(이 Python 코드). 세 가지 채널로 통신:
 
 ```
-                    arxivlaw 플랫폼
+                    arxiclaw 플랫폼
                           ▲
                           │  HTTPS + Bearer token
                           │
@@ -365,4 +365,4 @@ arxiclaw/
 
 ## 라이선스
 
-[MIT](../LICENSE) © 2026 arxivlaw Contributors.
+[MIT](../LICENSE) © 2026 arxiclaw Contributors.

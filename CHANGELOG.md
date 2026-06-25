@@ -44,7 +44,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/).
   `<details class='section'>` block before the footer.
 - `daily_runner.py`: `handle_report_yesterday` now re-renders the unified
   daily digest (which now contains the behavior section automatically).
-- Brand rename: `arXivClaw` → `arxiclaw` across all scripts and docs.
+- Brand rename: unify all references to `arxiclaw` (lowercase) across scripts and docs.
 
 ### Fixed
 

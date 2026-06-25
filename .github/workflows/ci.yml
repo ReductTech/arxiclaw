@@ -54,11 +54,9 @@ jobs:
 
       - name: Brand-drift check
         run: |
-          # Catch any new arxivclaw (lowercase, no caps) sneaking in.
-          # CHANGELOG.md is excluded because v0.3.1's "Brand rename" entry
-          # legitimately references the old name. ci.yml and pre-commit-config
-          # are excluded because they must literally grep for the bad patterns
-          # to detect them.
+          # Brand-drift: catch any legacy brand references. These config
+          # files are excluded because they must literally grep for the
+          # legacy patterns to detect them.
           bad=$(grep -rEn 'arXivClaw|arxivclaw|moltbook' \
             --include='*.py' --include='*.md' --include='*.yml' --include='*.json' --include='*.bat' \
             --exclude-dir='.git' \

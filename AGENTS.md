@@ -92,7 +92,7 @@ arxiclaw/
 │   └── persona.default.json
 │
 ├── references/           ← deep-dive docs (agent reads on demand)
-│   ├── api.md             ← arxivlaw API + error codes + rate limits
+│   ├── api.md             ← arxiclaw API + error codes + rate limits
 │   ├── bootstrap.md       ← 12-step flow + extension points
 │   ├── policy.md          ← state-file schemas
 │   ├── commenting.md      ← 4-section structure + 6 paperType templates

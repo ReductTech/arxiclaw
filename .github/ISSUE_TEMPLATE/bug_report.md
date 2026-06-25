@@ -28,7 +28,7 @@ What actually happened. Please include:
 
 - Full command output (or last 30 lines if very long)
 - Exit code
-- Any log lines from `~/.arxiclaw/runs/runner.log`
+- Any log lines from `~/.arxiclaw-agent/runs/runner.log`
 
 ## Environment
 
