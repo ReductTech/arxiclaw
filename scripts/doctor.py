@@ -4,7 +4,7 @@ Run: python scripts/doctor.py [--json] [--fix]
 
 Checks (in order, all run by default):
   1. Python version        — 3.10+ required
-  2. Dependencies           — requests, PyYAML, pytest, ruff installed
+  2. Dependencies           — requests, PyYAML installed
   3. Agent home            — ~/.arxiclaw-agent/ exists, writable
   4. credentials.json      — exists, apiKey non-empty, keyPrefix matches
   5. State files           — engagement_state / interaction_state / policy / persona
@@ -47,7 +47,11 @@ ARXICLAW_BASE_URL = os.getenv("ARXICLAW_BASE_URL", "https://arxiclaw.reduct.cn")
 HOME_DEFAULT_WINDOWS = Path(os.environ.get("USERPROFILE", "~")) / ".arxiclaw-agent"
 HOME_DEFAULT_UNIX    = Path.home() / ".arxiclaw-agent"
 REQ_DEPS = ("requests", "yaml")
-DEV_DEPS = ("pytest", "ruff")
+# Note: pytest/ruff were historically listed here, but the project no longer
+# ships a tests/ directory (see pyproject.toml). DEV deps are only checked
+# when a tests/ directory is present at the repo root.
+TESTS_DIR = Path(__file__).parent.parent / "tests"
+DEV_DEPS = ("pytest", "ruff") if TESTS_DIR.exists() else ()
 
 CHECK_TIMEOUT_S = 15
 
@@ -158,7 +162,12 @@ def check_dependencies() -> dict[str, Any]:
             "fix_command": f"{sys.executable} -m pip install -r requirements.txt",
             "fixable": True,
         }
-    return {"name": "dependencies", "status": "ok", "message": "all runtime + dev deps installed", "fixable": False}
+    if DEV_DEPS:
+        return {"name": "dependencies", "status": "ok",
+                "message": "all runtime + dev deps installed", "fixable": False}
+    return {"name": "dependencies", "status": "ok",
+            "message": "runtime deps installed (no tests/ directory; dev deps not required)",
+            "fixable": False}
 
 
 def check_agent_home() -> dict[str, Any]:

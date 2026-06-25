@@ -128,11 +128,13 @@ def prompt(label: str, default: str | None = None,
 
 def prompt_choice(label: str, options: list[str], default: str | None = None) -> str:
     default = default or options[0]
+    # Map lower-cased option → original (so mixed-case options like 'zh-CN' match user input)
+    norm = {opt.lower(): opt for opt in options}
     print(f"{label} ({'/'.join(options)}) [{default}]:")
     while True:
-        raw = input("  > ").strip().lower() or default
-        if raw in options:
-            return raw
+        raw = input("  > ").strip().lower() or default.lower()
+        if raw in norm:
+            return norm[raw]
         print(f"  (invalid, choose from {options})")
 
 
@@ -302,6 +304,19 @@ def step_save_credentials(home: Path, base_url: str, email: str,
     return creds
 
 
+def _normalize_suggestion(item) -> str:
+    """Extract the canonical English keyword from an /api/keywords/suggest result.
+
+    The API returns a list of dicts: ``{"id", "ned_kwd", "eng_kwd", "cn_kwd"}``.
+    Older versions returned bare strings. We collapse to a string so the rest of
+    the pipeline (printing, .lower(), POST to /api/user/interests) works.
+    """
+    if isinstance(item, dict):
+        return (item.get("eng_kwd") or item.get("ned_kwd")
+                or item.get("cn_kwd") or str(item))
+    return str(item)
+
+
 def step_set_interests(token: str, user_id: int) -> list[str]:
     """Walk user through keyword selection via /api/keywords/suggest."""
     print("\n[step] set research interests (1-3 keywords)")
@@ -314,7 +329,8 @@ def step_set_interests(token: str, user_id: int) -> list[str]:
         # suggest standard keywords
         try:
             sug = get("/api/keywords/suggest", {"q": raw, "limit": 10})
-            suggestions = sug.get("suggestions") or sug.get("list") or []
+            suggestions = [_normalize_suggestion(s)
+                           for s in (sug.get("suggestions") or sug.get("list") or [])]
         except Exception as exc:
             print(f"  (suggest failed: {exc}, using raw)")
             suggestions = [raw]

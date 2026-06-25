@@ -2591,6 +2591,12 @@ def handle_execute_actions(argv: list[str]) -> int:
             stream.reconfigure(encoding="utf-8", errors="replace")
         except (AttributeError, OSError):
             pass
+    if any(a in ("-h", "--help", "help") for a in argv):
+        print("usage: execute-actions [--file <path>] [--dry-run] "
+              "[--date YYYY-MM-DD]", flush=True)
+        print("       if --file is omitted, looks for "
+              "runs/<today>/agent_actions.json", flush=True)
+        return 0
     action_file = _parse_flag(argv, "file")
     if not action_file:
         action_file = "agent_actions.json"
