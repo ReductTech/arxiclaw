@@ -179,6 +179,16 @@ def step_verify_code(email: str) -> str:
                 raise
 
 
+def _read_api_key_prefix(block, api_key: str) -> str:
+    """Extract the key prefix from an /api/auth/* response, supporting both the
+    legacy 'keyPrefix' field and the current 'apiKeyPrefix' field. Falls back
+    to the first 20 chars of the key if neither is present."""
+    if isinstance(block, dict):
+        return (block.get("apiKeyPrefix") or block.get("keyPrefix")
+                or api_key[:20])
+    return api_key[:20]
+
+
 def step_bootstrap(ticket: str, username: str, key_name: str) -> dict:
     body = {"ticket": ticket, "keyName": key_name}
     if username:
@@ -191,7 +201,7 @@ def step_bootstrap(ticket: str, username: str, key_name: str) -> dict:
         raise RuntimeError(f"no apiKey in response: {r}")
     return {
         "apiKey": api_key,
-        "keyPrefix": api_key_block.get("keyPrefix", api_key[:20]),
+        "apiKeyPrefix": _read_api_key_prefix(api_key_block, api_key),
         "accessToken": r.get("accessToken"),
         "user": r.get("user") or {},
     }
@@ -203,9 +213,11 @@ def verify_api_key(api_key: str) -> dict:
     if not token:
         raise RuntimeError("no accessToken returned by /api/auth/token")
     user = get("/api/auth/me", headers={"Authorization": f"Bearer {token}"})
+    # Some token responses also return the apiKey block (newer API); accept it.
+    api_key_block = r.get("apiKey") or {}
     return {
         "apiKey": api_key,
-        "keyPrefix": api_key[:20],
+        "apiKeyPrefix": _read_api_key_prefix(api_key_block, api_key),
         "accessToken": token,
         "user": user or r.get("user") or {},
     }
@@ -288,6 +300,11 @@ def read_api_key_from_location(location: str,
 def step_save_credentials(home: Path, base_url: str, email: str,
                           username: str, key_name: str, payload: dict) -> dict:
     user = payload["user"]
+    # The platform API renamed the prefix field from "keyPrefix" to
+    # "apiKeyPrefix". Accept either from the caller; write both for
+    # backward compatibility with older doctor / daily_runner readers.
+    key_prefix = (payload.get("apiKeyPrefix")
+                  or payload.get("keyPrefix") or "")
     creds = {
         "baseUrl": base_url,
         "apiKey": payload["apiKey"],
@@ -295,7 +312,8 @@ def step_save_credentials(home: Path, base_url: str, email: str,
         "username": user.get("username") or username,
         "email": email,
         "keyName": key_name,
-        "keyPrefix": payload["keyPrefix"],
+        "apiKeyPrefix": key_prefix,
+        "keyPrefix": key_prefix,
         "createdAt": datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ"),
     }
     creds_path = home / "credentials.json"
@@ -678,7 +696,7 @@ def main() -> int:
         creds = json.loads((home / "credentials.json").read_text(encoding="utf-8"))
         print("[info] credentials.json already exists.")
         print(f"  user: {creds.get('username')} (id={creds.get('userId')})")
-        print(f"  key prefix: {creds.get('keyPrefix')}")
+        print(f"  key prefix: {creds.get('apiKeyPrefix') or creds.get('keyPrefix')}")
         if prompt("  Re-bootstrap (this will overwrite)?", default="n").lower() not in ("y", "yes"):
             print("[exit] existing credentials preserved")
             return 0
@@ -748,7 +766,7 @@ def main() -> int:
     print("  ✅ Bootstrap complete")
     print("=" * 60)
     print(f"  📁 Agent home: {home}")
-    print(f"  🔑 API Key prefix: {creds['keyPrefix']}    (do not share)")
+    print(f"  🔑 API Key prefix: {creds.get('apiKeyPrefix') or creds.get('keyPrefix')}    (do not share)")
     print(f"  👤 User: {creds['username']} (id={creds['userId']}) {creds['email']}")
     print(f"  🎯 Interests: {', '.join(interests)}")
     print(f"  🌐 Language: comment={lang} digest={lang} feedback={lang} stored={lang}")

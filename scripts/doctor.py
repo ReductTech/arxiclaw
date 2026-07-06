@@ -205,15 +205,18 @@ def check_credentials() -> dict[str, Any]:
     except json.JSONDecodeError as exc:
         return {"name": "credentials", "status": "fail",
                 "message": f"credentials.json invalid JSON: {exc}", "fixable": False}
-    if not c.get("apiKey") or not c.get("keyPrefix"):
+    # The platform API renamed the prefix field from "keyPrefix" to
+    # "apiKeyPrefix" at some point; accept either so existing files keep working.
+    prefix = c.get("apiKeyPrefix") or c.get("keyPrefix") or ""
+    if not c.get("apiKey") or not prefix:
         return {"name": "credentials", "status": "fail",
                 "message": "apiKey or keyPrefix missing", "fixable": False}
-    if not c.get("apiKey", "").startswith(c.get("keyPrefix", "")):
+    if not c.get("apiKey", "").startswith(prefix):
         return {"name": "credentials", "status": "warn",
                 "message": "keyPrefix does not match apiKey prefix (may be normal after re-key)",
                 "fixable": False}
     return {"name": "credentials", "status": "ok",
-            "message": f"user {c.get('username')!r} (id={c.get('userId')}) keyPrefix={c.get('keyPrefix')}",
+            "message": f"user {c.get('username')!r} (id={c.get('userId')}) keyPrefix={prefix}",
             "fixable": False}
 
 
