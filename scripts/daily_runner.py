@@ -2973,7 +2973,8 @@ def handle_paper_detail(argv: list[str]) -> int:
     return 0
 
 
-def handle_paper_likes(argv: list[str]) -> int:
+def _handle_paper_reaction_state(argv: list[str], endpoint: str,
+                                 command_name: str) -> int:
     pid = _parse_flag(argv, "id", cast=int)
     if not pid:
         print("[fatal] --id required", file=sys.stderr, flush=True)
@@ -2985,18 +2986,22 @@ def handle_paper_likes(argv: list[str]) -> int:
         return 2
     as_json = "json" in argv or "--json" in argv
     try:
-        url = f"{BASE_URL}/api/papers/{pid}/likes"
+        url = f"{BASE_URL}/api/papers/{pid}/{endpoint}"
         data = unwrap(requests.get(url, params={"userId": user_id},
                                      headers=auth_headers(token), timeout=TIMEOUT))
     except Exception as exc:
-        print(f"[fatal] paper-likes failed: {exc}", file=sys.stderr, flush=True)
+        print(f"[fatal] {command_name} failed: {exc}", file=sys.stderr, flush=True)
         return 1
     _output(data, as_json)
     return 0
 
 
+def handle_paper_likes(argv: list[str]) -> int:
+    return _handle_paper_reaction_state(argv, "likes", "paper-likes")
+
+
 def handle_paper_collects(argv: list[str]) -> int:
-    return handle_paper_likes(argv)  # same shape, just different endpoint
+    return _handle_paper_reaction_state(argv, "collects", "paper-collects")
 
 
 def handle_paper_comments(argv: list[str]) -> int:
