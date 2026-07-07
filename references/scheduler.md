@@ -15,9 +15,28 @@ The agent registers via platform-native methods on user authorization:
 
 ### Windows Task Scheduler
 
-The agent uses PowerShell COM or schtasks. Task body is "launch the agent client".
+The agent uses PowerShell COM or `schtasks`. The current implementation writes
+a small wrapper (`run_daily.bat`) and registers a Task Scheduler entry that runs
+the daily runner.
 
 See the `_windows_install()` function in `scripts/install_schedule.py`.
+
+Default Windows install:
+
+- current-user scheduled task
+- no administrator privilege required
+- runs when the machine is on and the user session is available
+- does not guarantee execution while the machine is shut down, asleep, or
+  before login
+
+Optional stronger modes should be explicit and opt-in:
+
+- logon fallback: run once when the user logs in after missing the scheduled
+  time
+- highest privileges: may require UAC/admin approval
+- wake to run: depends on Task Scheduler and power settings
+- run whether user is logged on or not: requires credential/system-level
+  configuration
 
 ### Unix cron / systemd timer
 
@@ -27,9 +46,10 @@ See the `_unix_install()` function in `scripts/install_schedule.py`.
 
 ## How the daily run is triggered
 
-When the agent registers a schedule, **the task body is "launch the agent client"**. Once the agent client is launched, **it** does the "daily run" itself.
-
-**Don't** use "the schedule runs a Python script" — that violates the "agent is its own LLM" design.
+When the agent registers a schedule, the task body must launch the local
+arxiclaw client path for that installation. In this repository, that is
+`run_daily.bat`/`daily_runner.py`; agent-native clients may instead launch
+their own client process and then call the same runner commands.
 
 ## User unschedule
 
@@ -39,13 +59,16 @@ See `scripts/uninstall.py`.
 
 ## Scheduling ≠ real-time
 
-- **Scheduling**: covers "digest not missed when user is offline"
+- **Scheduling**: covers "digest generated automatically when the machine can
+  run it"
 - **Heartbeat**: covers "real-time comment, reply, heartbeat"
 
 The agent must tell the user 2 things in SKILL.md §0.2.1:
 
 1. Scheduling is a fallback, **cannot** replace agent online
-2. If the computer is often off, **enable both** (scheduling + agent occasionally online) for full coverage
+2. If the computer is often off, explain the platform limit and recommend
+   logon fallback, wake settings, or an always-on host plus occasional agent
+   sessions for full coverage
 
 ## Cross-platform automation
 

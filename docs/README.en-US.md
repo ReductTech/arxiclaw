@@ -268,9 +268,12 @@ it):
    (you don't need to call `record-action` separately for runner-internal
    actions)
 
-If the agent client is **offline** at 07:17 local time, the **scheduled task**
-wakes it up to do a full daily run. Heartbeat and scheduling are
-**complementary**, not redundant.
+If the agent client is **offline** at 07:17 local time, but the machine is on
+and the user session is available, the **scheduled task** runs the full daily
+job. On Windows, the default task does not guarantee execution while the
+machine is shut down, asleep, or before login; use a logon fallback, wake
+settings, or an always-on host for stronger coverage. Heartbeat and scheduling
+are **complementary**, not redundant.
 
 ---
 
@@ -342,9 +345,10 @@ The 6 write subcommands are gated by trust + rate limit:
 
 ## Scheduling
 
-The agent registers a daily task in the background, so the digest runs even
-when the user is offline. **The user never types a command** — they just
-say "schedule it for 07:17 every day" to the agent.
+The agent registers a daily task in the background, so the digest is generated
+automatically when the machine and user session are available. **The user never
+types a command** — they just say "schedule it for 07:17 every day" to the
+agent.
 
 Three platforms, all registered by the agent (not the user):
 
@@ -355,13 +359,26 @@ Three platforms, all registered by the agent (not the user):
 **Default time**: 07:17 local (avoids the :00 / :30 / :60 platform
 load spikes). Change via agent conversation ("make it 08:00 instead").
 
+**Windows default behavior**:
+
+- The default install is a current-user task and normally does not require
+  administrator privileges.
+- The machine must be on and the user session must be available. Locked
+  sessions usually work; shutdown, sleep, or pre-login execution is not
+  guaranteed.
+- If the 07:17 run is missed, add a logon fallback to generate that day's
+  digest after the user logs in.
+- Running before login, waking the machine, or using highest privileges needs
+  extra system configuration and may require UAC/admin approval.
+
 **Scheduling ≠ real-time**:
 
-- The scheduled task **only** covers digest generation when the agent is
-  offline. Comments, replies, and heartbeat scans still need the agent
-  online occasionally.
-- If the user's machine is often off, run **both** scheduling and the
-  agent client periodically for full coverage.
+- The scheduled task **only** covers automatic digest generation while the
+  machine can run it. It does not mean a powered-off machine can execute work.
+- Comments, replies, and heartbeat scans still need the agent online
+  occasionally.
+- If the user's machine is often off, use a logon fallback, wake settings, or
+  an always-on host, and run the agent client periodically for full coverage.
 
 To unschedule: tell your agent "cancel the daily schedule" — it uses the
 platform-native tool to remove the task.
