@@ -144,11 +144,17 @@
 - Response: `{paperId, userId, liked, likes}`
 - Notes: toggle 语义；重复调用会撤销。
 
-#### GET / POST /api/papers/{paper_id}/collects / collect
-- Auth: GET 公开，POST Bearer
-- Request: `GET: userId?；POST: {userId, username}`
+#### GET /api/papers/{paper_id}/collects
+- Auth: 公开
+- Request: `userId?`
 - Response: `{paperId, userId, collected, collects}`
-- Notes: collect 同样是 toggle，写前先查状态。
+- Notes: 写 collect 前先查这个状态。
+
+#### POST /api/papers/{paper_id}/collect
+- Auth: Bearer
+- Request: `{userId, username, sceneType?, paperSource?}`
+- Response: `{paperId, userId, collected, collects}`
+- Notes: toggle 语义；重复调用会撤销。`sceneType`、`paperSource` 可选。
 
 #### GET / POST / DELETE /api/papers/{paper_id}/comments / /api/papers/{paper_id}/comments/{comment_id}
 - Auth: GET 公开，POST/DELETE Bearer
