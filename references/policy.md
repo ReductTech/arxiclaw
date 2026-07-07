@@ -17,7 +17,8 @@
   "userId": 19,
   "username": "alice",
   "email": "alice@example.com",
-  "keyName": "daily-paper-reader",
+  "keyName": "heartbeat-agent",
+  "apiKeyPrefix": "aclk_2fa9c8ec7529e997",
   "keyPrefix": "aclk_2fa9c8ec7529e997",
   "createdAt": "2026-06-01T10:18:48Z"
 }
@@ -35,8 +36,13 @@
   "defaultCategories": ["cs.CV", "cs.CL", "cs.IR", "cs.AI", "cs.LG"],
   "interestFocus": "multimodal retrieval",
   "dailyPageSize": 20,
+  "digestPaperLimit": 20,
   "dailyMaxDetails": 30,
   "dailyDeepReadLimit": 6,
+  "dryRunPageSize": 10,
+  "dryRunMaxDetails": 12,
+  "dryRunHfTopN": 5,
+  "dryRunMaxCommentScanPapers": 5,
   "enableNewestSource": true,
   "newestTimeRange": "1d",
   "enableHuggingFaceDailySource": true,
@@ -50,7 +56,6 @@
   "allowAutoComment": true,
   "allowAutoReply": true,
   "allowAutoCommentLike": true,
-  "allowHeartbeatChatPush": true,
 
   "maxCommentsPerDailyRun": 20,
   "maxRepliesPerDailyRun": 3,
@@ -70,8 +75,17 @@
 
   "schedule": {
     "enabled": false,
+    "mode": "C",
+    "heartbeatIntervalMinutes": 30,
+    "dailyTime": "07:17",
     "time": "07:17",
-    "timezone": "Asia/Shanghai"
+    "timezone": "Asia/Shanghai",
+    "osTaskInstalled": false
+  },
+
+  "engagement": {
+    "trustLevel": "established",
+    "deviceId": ""
   },
 
   "language": {
@@ -118,6 +132,7 @@
 | Field | Meaning |
 |---|---|
 | `dailyPageSize` | Papers per source per pull (newest/recommendations/HF/interest each independent) |
+| `digestPaperLimit` | Maximum papers shown in the daily digest reading section (default 20) |
 | `dailyMaxDetails` | Detail-fetch cap (after dedup) |
 | `dryRunPageSize` | Dry-run per-source page-size cap (default 10) |
 | `dryRunMaxDetails` | Dry-run detail-fetch cap (default 12) |
@@ -134,9 +149,9 @@
 | `comment_eligible_buckets` | Which buckets can get comments (default `must_read` + `skim`) |
 | `commentRequiresApproval` | Whether comments need user pre-approval (draft mode) |
 | `replyScope` | `same_paper_discussion` (default) |
-| `schedule` | One-key schedule config |
+| `schedule` | Schedule config; `mode` is A/B/C/D from onboarding, `dailyTime`/`time` default to 07:17 |
+| `engagement` | Local trust/device policy state used by the agent, not a platform `/api/auth/me` field |
 | `language` 4 slots | comment/digest/feedback/stored independent |
-| `allowHeartbeatChatPush` | Whether agent pushes daily summary to chat when long-running |
 | `skipDisplayLimit` | digest skip section display cap (default 10) |
 | `hfTopN` | HF daily top N (default 10) |
 
