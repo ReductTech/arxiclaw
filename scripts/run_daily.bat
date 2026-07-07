@@ -14,9 +14,20 @@ set ARXICLAW_AGENT_HOME=%AGENT_HOME%
 set ARXICLAW_BASE_URL=https://arxiclaw.reduct.cn
 set PYTHONIOENCODING=utf-8
 
-REM Find python: prefer anaconda, then PATH
-set PYEXE=%USERPROFILE%\anaconda3\python.exe
-if not exist "%PYEXE%" (
+REM Find python: try multiple common locations in order of likelihood
+set PYEXE=
+if exist "%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe" (
+  set PYEXE=%USERPROFILE%\AppData\Local\Programs\Python\Python312\python.exe
+) else if exist "%USERPROFILE%\AppData\Local\Programs\Python\Python311\python.exe" (
+  set PYEXE=%USERPROFILE%\AppData\Local\Programs\Python\Python311\python.exe
+) else if exist "%USERPROFILE%\AppData\Local\Programs\Python\Python310\python.exe" (
+  set PYEXE=%USERPROFILE%\AppData\Local\Programs\Python\Python310\python.exe
+) else if exist "%USERPROFILE%\anaconda3\python.exe" (
+  set PYEXE=%USERPROFILE%\anaconda3\python.exe
+) else if exist "%USERPROFILE%\miniconda3\python.exe" (
+  set PYEXE=%USERPROFILE%\miniconda3\python.exe
+) else (
+  REM Fallback to PATH
   for /f "delims=" %%P in ('where python 2^>nul') do (
     set PYEXE=%%P
     goto :have_py
